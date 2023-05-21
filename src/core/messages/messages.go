@@ -13,13 +13,13 @@ const (
 )
 
 type EngineServer interface {
-	CoreReady(r io.Reader) error
-	CoreInfo(r io.Reader) error
-	PixelBatch(r io.Reader) error
+	CoreReady(body []byte) error
+	CoreInfo(body []byte) error
+	PixelBatch(body []byte) error
 }
 
 func EngineRouter(s EngineServer) submsg.MsgReceiver {
-	return func(id submsg.MsgId, body io.Reader) error {
+	return func(id submsg.MsgId, body []byte) error {
 		switch id {
 		case EngineMsgCoreReady:
 			return s.CoreReady(body)
@@ -56,12 +56,12 @@ const (
 )
 
 type CoreServer interface {
-	Info(r io.Reader) error
-	RenderFrame(r io.Reader) error
+	Info(body []byte) error
+	RenderFrame(body []byte) error
 }
 
 func CoreRouter(s CoreServer) submsg.MsgReceiver {
-	return func(id submsg.MsgId, body io.Reader) error {
+	return func(id submsg.MsgId, body []byte) error {
 		switch id {
 		case CoreMsgInfo:
 			return s.Info(body)

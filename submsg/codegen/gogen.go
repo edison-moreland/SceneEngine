@@ -36,7 +36,7 @@ func (g *goGen) Server(prefix string, messages []MsgDesc) {
 	g.Type().Id(serverInterfaceId).InterfaceFunc(func(g *jen.Group) {
 		for _, msg := range messages {
 			g.Id(snakeToGoId(true, msg.Name)).
-				Call(jen.Id("r").Qual("io", "Reader")).
+				Call(jen.Id("body").Id("[]byte")).
 				Id("error")
 		}
 	})
@@ -45,7 +45,7 @@ func (g *goGen) Server(prefix string, messages []MsgDesc) {
 	innerFunc := jen.Func().
 		Params(
 			jen.Id("id").Qual(runtimeImport, "MsgId"),
-			jen.Id("body").Qual("io", "Reader")).
+			jen.Id("body").Id("[]byte")).
 		Error().
 		Block(jen.Switch(jen.Id("id")).BlockFunc(func(g *jen.Group) {
 			for _, msg := range messages {

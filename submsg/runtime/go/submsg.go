@@ -19,7 +19,7 @@ var (
 
 type MsgId uint32
 type MsgSender func(id MsgId, length uint32, body io.Reader)
-type MsgReceiver func(id MsgId, body io.Reader) error
+type MsgReceiver func(id MsgId, body []byte) error
 
 type msg struct {
 	id     MsgId
@@ -119,16 +119,18 @@ func msgReceiver(ctx context.Context, childOut io.Reader, receiver MsgReceiver) 
 			msgId := MsgId(byteOrder.Uint32(recvBuffer[:4]))
 			msgLength := byteOrder.Uint32(recvBuffer[4:8])
 
-			limitedReader := io.LimitReader(childOut, int64(msgLength))
+			body := make([]byte, msgLength)
+			_, err = io.ReadAtLeast(childOut, body, int(msgLength))
+			if err != nil {
+				err = fmt.Errorf("%w: reading body of msg %d", err, msgId)
+				panic(err)
+			}
 
-			err = receiver(msgId, limitedReader)
+			err = receiver(msgId, body)
 			if err != nil {
 				err = fmt.Errorf("%w: handling msg %d", err, msgId)
 				panic(err)
 			}
-
-			// Throw away anything not read by the handler
-			_, _ = io.ReadAll(limitedReader)
 		}
 	}
 }

@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/vmihailenco/msgpack/v5"
@@ -42,7 +41,11 @@ func Start(ctx context.Context, path string) (*RenderCore, error) {
 
 // Respond to messages from the core
 
-func (r *RenderCore) CoreReady(_ io.Reader) error {
+func (r *RenderCore) CoreReady(_ []byte) error {
+	// If this channel isn't nil, that means a render is in progress
+	// The core will send the ready message when a render concludes
+	// To notify the downstream that the render is complete, we need to close the channel
+	// We should introduce explicit "phases", eg: "starting", "ready", "rendering"
 	if r.pixelsOut != nil {
 		close(r.pixelsOut)
 	}
@@ -51,14 +54,9 @@ func (r *RenderCore) CoreReady(_ io.Reader) error {
 	return nil
 }
 
-func (r *RenderCore) CoreInfo(body io.Reader) error {
-	b, err := io.ReadAll(body)
-	if err != nil {
-		return err
-	}
-
+func (r *RenderCore) CoreInfo(body []byte) error {
 	var coreInfo messages.MsgCoreInfo
-	err = msgpack.Unmarshal(b, &coreInfo)
+	err := msgpack.Unmarshal(body, &coreInfo)
 	if err != nil {
 		return err
 	}
@@ -69,14 +67,9 @@ func (r *RenderCore) CoreInfo(body io.Reader) error {
 	return nil
 }
 
-func (r *RenderCore) PixelBatch(body io.Reader) error {
-	b, err := io.ReadAll(body)
-	if err != nil {
-		return err
-	}
-
+func (r *RenderCore) PixelBatch(body []byte) error {
 	var pixels []messages.Pixel
-	err = msgpack.Unmarshal(b, &pixels)
+	err := msgpack.Unmarshal(body, &pixels)
 	if err != nil {
 		return err
 	}
@@ -87,6 +80,9 @@ func (r *RenderCore) PixelBatch(body io.Reader) error {
 
 	return nil
 }
+
+// The actual public methods are below \/
+// TODO: add another layer of separation here so the methods above aren't public
 
 // WaitForReady will wait until the Core is ready for another command
 func (r *RenderCore) WaitForReady() {
@@ -103,6 +99,7 @@ func (r *RenderCore) Info() string {
 	return r.info
 }
 
+// StartRender will start rendering the next frame
 func (r *RenderCore) StartRender() <-chan messages.Pixel {
 	if r.pixelsOut == nil {
 		r.pixelsOut = make(chan messages.Pixel)
