@@ -6,12 +6,13 @@ import (
 	"io"
 	"os"
 
+	"github.com/edison-moreland/SceneEngine/src/core/messages"
 	"github.com/edison-moreland/SceneEngine/submsg/runtime/go"
 )
 
 // RenderCore provides an interface to the external rendering engine
 type RenderCore struct {
-	client *CoreClient
+	client *messages.CoreClient
 	info   string
 
 	ready chan bool // notify when RenderCore is ready
@@ -26,11 +27,11 @@ func Start(ctx context.Context, path string) (*RenderCore, error) {
 		ready: make(chan bool),
 	}
 
-	sendMsg, err := submsg.Start(ctx, path, EngineRouter(&core))
+	sendMsg, err := submsg.Start(ctx, path, messages.EngineRouter(&core))
 	if err != nil {
 		return nil, err
 	}
-	core.client = NewCoreClient(sendMsg)
+	core.client = messages.NewCoreClient(sendMsg)
 
 	return &core, nil
 }
