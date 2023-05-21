@@ -1,0 +1,44 @@
+# Builtin types: None, String, Bool, Int, Uint, Float
+#types:
+#  render_config:
+#    aspect_ratio: Float
+#    image_width: Float
+#    samples: Uint,
+#    bounces: Uint,
+#
+#  vector:
+#    x: Float
+#    y: Float
+#    z: Float
+#
+#  sphere:
+#    radius: Float
+#    origin: vector
+#
+#  msg_ready:
+#    version: String # name/version of render core; like a user agent
+
+#messages:
+#  render_core:
+#    # config - Called to set the render to config for the next frames
+#    config: render_config
+#
+#  scene_engine:
+#    # ready - Called after the render core has initialized and is ready to receive the config
+#    ready: msg_ready
+#
+#    # ack - Called when the render core has finished processing the last message
+#    ack: None
+
+messages:
+  # engine messages are handled by SceneEngine
+  engine:
+    - name: core_ready
+      desc: Inform SceneEngine that the render core is ready for work
+    - name: core_info
+      desc: Inform SceneEngine of the render core's name/version
+
+  # core messages are handled by the render core
+  core:
+    - name: info
+      desc: Request that the render core calls engine.core_info

@@ -1,0 +1,50 @@
+#!/bin/bash
+set -euo pipefail
+
+project_root="$(dirname "$(realpath "$0")")"
+
+
+function compile_render_core() {
+  corral run -- ponyc --debug -o "${project_root}"/build/bin "${project_root}"/render_core
+}
+
+function compile_scene_engine() {
+  go build -o "${project_root}"/build/bin/scene_engine "${project_root}"/src/*.go
+}
+
+function generate_submsg_libraries() {
+  go run "${project_root}"/submsg/codegen/*.go \
+    --descriptor "${project_root}"/submsg.yaml \
+    --go-output "${project_root}"/src/core/messages.go \
+    --go-package "core" \
+    --pony-output "${project_root}"/render_core/messages.pony
+}
+
+function run_scene_engine() {
+  generate_submsg_libraries
+  compile_render_core
+  compile_scene_engine
+  "${project_root}"/build/bin/scene_engine --core="${project_root}/build/bin/render_core"
+}
+
+case "${1:-run}" in
+  "build")
+    generate_submsg_libraries
+    compile_render_core
+    compile_scene_engine
+    ;;
+  "build-core")
+    compile_render_core
+    ;;
+  "build-engine")
+    compile_scene_engine
+    ;;
+  "build-submsg")
+    generate_submsg_libraries
+    ;;
+  "run")
+    run_scene_engine
+    ;;
+  *)
+    echo "That's not a command!"
+esac

@@ -1,0 +1,17 @@
+{{- with $prefix := .Prefix | capitalize }}
+interface tag {{ $prefix }}Server
+{{- range $i, $msg := $.Messages }}
+    fun tag {{ $msg.Name | snakeToCamel }}(body: Array[U8] iso)
+{{- end }}
+
+primitive {{ $prefix }}Router
+    fun apply(s: {{ $prefix }}Server): ReceiveMsg =>
+        {(id: MsgId, body: Array[U8] iso) =>
+            match id
+{{- range $i, $msg := $.Messages }}
+            | {{ $prefix }}.{{ $msg.Name | snakeToCamel }}() => s.{{ $msg.Name | snakeToCamel }}(consume body)
+{{- end }}
+            end
+        }
+
+{{- end }}

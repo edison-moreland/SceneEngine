@@ -1,0 +1,5 @@
+
+primitive {{ .Prefix | capitalize }}
+{{- range $i, $msg := .Messages }}
+    fun {{ $msg.Name | snakeToCamel }}(): MsgId => {{ $i }}
+{{- end }}
