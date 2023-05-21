@@ -1,5 +1,6 @@
 use "collections"
 use "debug"
+use "buffered"
 
 type MsgId is U32
 type SendMsg is {(MsgId, (Array[U8 val] iso | None))} val
@@ -17,6 +18,8 @@ actor _MsgSender
         out = out'
 
     be apply(id: MsgId, data: (Array[U8] iso | None)) =>
+        // TODO: Rewrite this using https://stdlib.ponylang.io/buffered-Writer/
+
         let data_size: USize = match data
         | None => 0
         | let d: Array[U8] iso => d.size()
@@ -33,42 +36,20 @@ actor _MsgSender
         out.flush()
 
 class _MsgReceiver is InputNotify
-    var _recv_buf: Array[U8] ref = Array[U8]()
-    var _targetSize: USize = 8
-
     let _receive_msg: ReceiveMsg
 
     new iso create(receive_msg: ReceiveMsg) =>
         _receive_msg = receive_msg
 
     fun ref apply(data: Array[U8 val] iso) =>
-        // We could be sent data in any size chunk
-        // We need to collect the entire message into _recv_buf before sending it off
+        let rb = Reader.>append(consume data)
 
-        _recv_buf.append(consume data)
+        try
+            let msg_id = rb.u32_le()?
+            let msg_len = rb.u32_le()?
 
-        if _recv_buf.size() < _targetSize then
-            return
-        end
-
-        (let msg_id, let msg_length) = try
-            (_recv_buf.read_u32(0)?, _recv_buf.read_u32(4)?)
+            _receive_msg(msg_id, rb.block(msg_len.usize())?)
         else
+            // TODO: handle this. What happens if the chunk we get is too small?
             return
         end
-
-        if _recv_buf.size() < (msg_length+8).usize() then
-            _targetSize = (msg_length+8).usize()
-            return
-        end
-
-        // Buffer is full of goodies!
-        let msg_buf: Array[U8] iso = recover Array[U8](msg_length.usize()) end
-        for v in _recv_buf.slice(where from=8).values() do
-            msg_buf.push(v)
-        end
-
-        _receive_msg(msg_id, consume msg_buf)
-
-        _recv_buf.clear()
-        _targetSize = 8
