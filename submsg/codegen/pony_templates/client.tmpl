@@ -1,12 +1,12 @@
 {{- with $prefix := .Prefix | capitalize }}
 actor {{ $prefix }}Client
-    let sendMsg: SendMsg
+    let send_msg: SendMsg
 
-    new create(sendMsg': SendMsg) =>
-        sendMsg = sendMsg'
+    new create(send_msg': SendMsg) =>
+        send_msg = send_msg'
 {{ range $i, $msg := $.Messages }}
-    be {{ $msg.Name | snakeToCamel }}(data: (Array[U8 val] iso | None)) =>
-        sendMsg({{ $prefix }}.{{ $msg.Name | snakeToCamel }}(), consume data)
+    be {{ $msg.Name }}(data: (Array[U8 val] iso | None)) =>
+        send_msg({{ $prefix }}.{{ $msg.Name }}(), consume data)
 {{ end }}
 
 {{- end }}

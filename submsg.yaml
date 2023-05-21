@@ -34,11 +34,18 @@ messages:
   # engine messages are handled by SceneEngine
   engine:
     - name: core_ready
-      desc: Inform SceneEngine that the render core is ready for work
+      desc: Core is ready for work
+
     - name: core_info
-      desc: Inform SceneEngine of the render core's name/version
+      desc: Core is giving it's name/version
+
+    - name: pixel_batch
+      desc: Core is returning a finished pixel
 
   # core messages are handled by the render core
   core:
     - name: info
       desc: Request that the render core calls engine.core_info
+
+    - name: render_frame
+      desc: Start rendering the next frame

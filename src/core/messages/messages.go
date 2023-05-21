@@ -7,13 +7,15 @@ import (
 )
 
 const (
-	EngineMsgCoreReady submsg.MsgId = 0
-	EngineMsgCoreInfo  submsg.MsgId = 1
+	EngineMsgCoreReady  submsg.MsgId = 0
+	EngineMsgCoreInfo   submsg.MsgId = 1
+	EngineMsgPixelBatch submsg.MsgId = 2
 )
 
 type EngineServer interface {
 	CoreReady(r io.Reader) error
 	CoreInfo(r io.Reader) error
+	PixelBatch(r io.Reader) error
 }
 
 func EngineRouter(s EngineServer) submsg.MsgReceiver {
@@ -23,6 +25,8 @@ func EngineRouter(s EngineServer) submsg.MsgReceiver {
 			return s.CoreReady(body)
 		case EngineMsgCoreInfo:
 			return s.CoreInfo(body)
+		case EngineMsgPixelBatch:
+			return s.PixelBatch(body)
 		default:
 			return submsg.ErrMsgIdUnknown
 		}
@@ -42,13 +46,18 @@ func (c *EngineClient) CoreReady(l uint32, b io.Reader) {
 func (c *EngineClient) CoreInfo(l uint32, b io.Reader) {
 	c.s(EngineMsgCoreInfo, l, b)
 }
+func (c *EngineClient) PixelBatch(l uint32, b io.Reader) {
+	c.s(EngineMsgPixelBatch, l, b)
+}
 
 const (
-	CoreMsgInfo submsg.MsgId = 0
+	CoreMsgInfo        submsg.MsgId = 0
+	CoreMsgRenderFrame submsg.MsgId = 1
 )
 
 type CoreServer interface {
 	Info(r io.Reader) error
+	RenderFrame(r io.Reader) error
 }
 
 func CoreRouter(s CoreServer) submsg.MsgReceiver {
@@ -56,6 +65,8 @@ func CoreRouter(s CoreServer) submsg.MsgReceiver {
 		switch id {
 		case CoreMsgInfo:
 			return s.Info(body)
+		case CoreMsgRenderFrame:
+			return s.RenderFrame(body)
 		default:
 			return submsg.ErrMsgIdUnknown
 		}
@@ -71,4 +82,7 @@ func NewCoreClient(s submsg.MsgSender) *CoreClient {
 }
 func (c *CoreClient) Info(l uint32, b io.Reader) {
 	c.s(CoreMsgInfo, l, b)
+}
+func (c *CoreClient) RenderFrame(l uint32, b io.Reader) {
+	c.s(CoreMsgRenderFrame, l, b)
 }

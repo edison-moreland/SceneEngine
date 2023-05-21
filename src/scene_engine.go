@@ -34,7 +34,12 @@ func main() {
 	}
 
 	renderCore.WaitForReady()
-	fmt.Printf("Using core: %s\n", renderCore.Info())
+	fmt.Printf("Using core: %s \n", renderCore.Info())
+
+	fmt.Println("Starting render.")
+	for pixel := range renderCore.StartRender() {
+		fmt.Printf("Received a pixel! %#v \n", pixel)
+	}
 
 	fmt.Println("Done. goodbye!")
 }

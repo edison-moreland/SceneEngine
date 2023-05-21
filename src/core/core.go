@@ -18,6 +18,8 @@ type RenderCore struct {
 	info   string
 
 	ready chan bool // notify when RenderCore is ready
+
+	pixelsOut chan messages.Pixel
 }
 
 func Start(ctx context.Context, path string) (*RenderCore, error) {
@@ -41,6 +43,10 @@ func Start(ctx context.Context, path string) (*RenderCore, error) {
 // Respond to messages from the core
 
 func (r *RenderCore) CoreReady(_ io.Reader) error {
+	if r.pixelsOut != nil {
+		close(r.pixelsOut)
+	}
+
 	r.ready <- true
 	return nil
 }
@@ -63,6 +69,25 @@ func (r *RenderCore) CoreInfo(body io.Reader) error {
 	return nil
 }
 
+func (r *RenderCore) PixelBatch(body io.Reader) error {
+	b, err := io.ReadAll(body)
+	if err != nil {
+		return err
+	}
+
+	var pixels []messages.Pixel
+	err = msgpack.Unmarshal(b, &pixels)
+	if err != nil {
+		return err
+	}
+
+	for _, p := range pixels {
+		r.pixelsOut <- p
+	}
+
+	return nil
+}
+
 // WaitForReady will wait until the Core is ready for another command
 func (r *RenderCore) WaitForReady() {
 	<-r.ready
@@ -76,4 +101,14 @@ func (r *RenderCore) Info() string {
 		<-r.ready
 	}
 	return r.info
+}
+
+func (r *RenderCore) StartRender() <-chan messages.Pixel {
+	if r.pixelsOut == nil {
+		r.pixelsOut = make(chan messages.Pixel)
+	}
+
+	r.client.RenderFrame(0, nil)
+
+	return r.pixelsOut
 }

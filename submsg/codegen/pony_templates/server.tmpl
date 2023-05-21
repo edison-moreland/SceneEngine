@@ -1,7 +1,7 @@
 {{- with $prefix := .Prefix | capitalize }}
 interface tag {{ $prefix }}Server
 {{- range $i, $msg := $.Messages }}
-    fun tag {{ $msg.Name | snakeToCamel }}(body: Array[U8] iso)
+    fun tag {{ $msg.Name }}(body: Array[U8] iso)
 {{- end }}
 
 primitive {{ $prefix }}Router
@@ -9,7 +9,7 @@ primitive {{ $prefix }}Router
         {(id: MsgId, body: Array[U8] iso) =>
             match id
 {{- range $i, $msg := $.Messages }}
-            | {{ $prefix }}.{{ $msg.Name | snakeToCamel }}() => s.{{ $msg.Name | snakeToCamel }}(consume body)
+            | {{ $prefix }}.{{ $msg.Name }}() => s.{{ $msg.Name }}(consume body)
 {{- end }}
             end
         }
