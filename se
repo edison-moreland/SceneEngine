@@ -17,7 +17,7 @@ function generate_submsg_libraries() {
     --descriptor "${project_root}"/submsg.yaml \
     --go-output "${project_root}"/src/core/messages/messages.go \
     --go-package "messages" \
-    --pony-output "${project_root}"/render_core/messages.pony
+    --pony-output "${project_root}"/render_core/messages/messages.pony
 }
 
 function run_scene_engine() {

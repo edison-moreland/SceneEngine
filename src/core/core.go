@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/vmihailenco/msgpack/v5"
+
 	"github.com/edison-moreland/SceneEngine/src/core/messages"
 	"github.com/edison-moreland/SceneEngine/submsg/runtime/go"
 )
@@ -44,12 +46,18 @@ func (r *RenderCore) CoreReady(_ io.Reader) error {
 }
 
 func (r *RenderCore) CoreInfo(body io.Reader) error {
-	coreInfo, err := io.ReadAll(body)
+	b, err := io.ReadAll(body)
 	if err != nil {
 		return err
 	}
 
-	r.info = string(coreInfo)
+	var coreInfo messages.MsgCoreInfo
+	err = msgpack.Unmarshal(b, &coreInfo)
+	if err != nil {
+		return err
+	}
+
+	r.info = coreInfo.Version
 	r.ready <- true
 
 	return nil

@@ -1,3 +1,4 @@
+use "messages"
 use "../submsg/runtime/pony"
 
 actor Main
@@ -13,7 +14,4 @@ actor Main
         env.err.print("PonyCore: ready")
 
     be info(body: Array[U8] iso) =>
-        let i = recover String end
-        i.append("PonyCore v0.0.1")
-
-        client.coreInfo((consume i).iso_array())
+        client.coreInfo(MsgCoreInfo("PonyCore v0.0.1").marshal())

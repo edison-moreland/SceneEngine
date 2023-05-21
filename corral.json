@@ -1,6 +1,11 @@
 {
   "packages": [],
-  "deps": [],
+  "deps": [
+    {
+      "locator": "github.com/seantallen-org/msgpack.git",
+      "version": "0.2.5"
+    }
+  ],
   "info": {
     "description": "",
     "homepage": "",
