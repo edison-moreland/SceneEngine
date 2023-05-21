@@ -1,4 +1,4 @@
-module scene_engine
+module github.com/edison-moreland/SceneEngine
 
 go 1.20
 

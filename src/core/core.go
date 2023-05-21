@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"scene_engine/submsg/runtime/go"
+	"github.com/edison-moreland/SceneEngine/submsg/runtime/go"
 )
 
 // RenderCore provides an interface to the external rendering engine

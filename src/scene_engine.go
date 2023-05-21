@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"scene_engine/src/core"
+	"github.com/edison-moreland/SceneEngine/src/core"
 )
 
 var corePath string

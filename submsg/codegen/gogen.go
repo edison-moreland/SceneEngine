@@ -8,7 +8,7 @@ import (
 	"github.com/dave/jennifer/jen"
 )
 
-const runtimeImport = "scene_engine/submsg/runtime/go"
+const runtimeImport = "github.com/edison-moreland/SceneEngine/submsg/runtime/go"
 
 type goGen struct {
 	*jen.File

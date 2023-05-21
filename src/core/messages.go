@@ -2,8 +2,8 @@
 package core
 
 import (
+	"github.com/edison-moreland/SceneEngine/submsg/runtime/go"
 	"io"
-	"scene_engine/submsg/runtime/go"
 )
 
 const (
