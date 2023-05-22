@@ -1,0 +1,84 @@
+
+class val {{ .Name | snakeToCamel | capitalize }} is MsgPackMarshalable
+{{- range $name, $type := .Fields }}
+    var {{ $name }}: {{ $type | ponyType }}
+{{- end }}
+
+    new val create(
+{{- $i := 1 }}
+{{- range $name, $type := .Fields }}
+{{- if ne $i $.FieldCount }}
+        {{ $name }}': {{ $type | ponyType }},
+{{- else }}
+        {{ $name }}': {{ $type | ponyType }}
+{{- end }}
+        {{- $i = add $i 1 }}
+{{- end }}
+        ) =>
+{{- range $name, $type := .Fields }}
+        {{ $name }} = {{ $name }}'
+{{- end }}
+
+    new val zero() =>
+{{- range $name, $type := .Fields }}
+{{- if $type | isPrimitive }}
+        {{ $name }} = {{ $type | zeroVal }}
+{{- else }}
+        {{ $name }} = {{ $type | ponyType }}.zero()
+{{- end}}
+{{- end}}
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, {{ .FieldCount }})?
+{{- range $name, $type := .Fields }}
+        MessagePackEncoder.fixstr(w, "{{ $name | snakeToCamel | capitalize }}")?
+{{- if eq $type "String" }}
+        MessagePackEncoder.{{ $type | msgpack }}(w, {{ $name }})?
+{{- else if $type | isPrimitive }}
+        MessagePackEncoder.{{ $type | msgpack }}(w, {{ $name }})
+{{- else }}
+        {{ $name }}.marshal_msgpack(w)?
+{{- end}}
+{{- end }}
+
+primitive UnmarshalMsgPack{{ .Name | snakeToCamel | capitalize }}
+    fun apply(r: Reader ref): {{ .Name | snakeToCamel | capitalize }} =>
+{{- range $name, $type := .Fields }}
+{{- if $type | isPrimitive }}
+        var {{ $name }}': {{ $type | ponyType }} = {{ $type | zeroVal }}
+{{- else }}
+        var {{ $name }}': {{ $type | ponyType }} = {{ $type | ponyType }}.zero()
+{{- end}}
+{{- end}}
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                match MessagePackDecoder.fixstr(r)?
+{{- range $name, $type := .Fields }}
+                | "{{ $name | snakeToCamel | capitalize }}" =>
+{{- if $type | isPrimitive }}
+                    {{ $name }}' = MessagePackDecoder.{{ $type | msgpack_decode }}(r)?
+{{- else }}
+                    {{ $name }}' = UnmarshalMsgPack{{ $name | snakeToCamel | capitalize }}(r)
+{{- end}}
+{{- end }}
+                else
+                    Debug("unknown field" where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        {{ .Name | snakeToCamel | capitalize }}(
+{{- $i := 1 }}
+{{- range $name, $type := .Fields }}
+{{- if ne $i $.FieldCount }}
+        {{ $name }}',
+{{- else }}
+        {{ $name }}'
+{{- end }}
+        {{- $i = add $i 1 }}
+{{- end }}
+        )

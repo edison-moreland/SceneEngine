@@ -42,6 +42,7 @@ type codegen interface {
 	MsgIds(string, []MsgDesc)
 	Server(string, []MsgDesc)
 	Client(string, []MsgDesc)
+	Type(string, map[string]string)
 	Done() error
 }
 
@@ -59,7 +60,7 @@ func main() {
 
 func generate(desc SubMsgDesc, generators ...codegen) error {
 	for _, g := range generators {
-		generatePackage(desc.Messages, g)
+		generatePackage(desc, g)
 
 		if err := g.Done(); err != nil {
 			return err
@@ -68,11 +69,14 @@ func generate(desc SubMsgDesc, generators ...codegen) error {
 	return nil
 }
 
-func generatePackage(desc MessagesDesc, gen codegen) {
-	gen.MsgIds("engine", desc.Engine)
-	gen.Server("engine", desc.Engine)
-	gen.Client("engine", desc.Engine)
-	gen.MsgIds("core", desc.Core)
-	gen.Server("core", desc.Core)
-	gen.Client("core", desc.Core)
+func generatePackage(desc SubMsgDesc, gen codegen) {
+	for prefix, messages := range desc.Messages {
+		gen.MsgIds(prefix, messages)
+		gen.Server(prefix, messages)
+		gen.Client(prefix, messages)
+	}
+
+	for name, fields := range desc.Types {
+		gen.Type(name, fields)
+	}
 }

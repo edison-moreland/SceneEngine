@@ -24,12 +24,8 @@ func loadDescriptor(path string) (SubMsgDesc, error) {
 
 // SubMsgDesc - Defines the structure of submsg.yaml
 type SubMsgDesc struct {
-	Messages MessagesDesc
-}
-
-type MessagesDesc struct {
-	Engine []MsgDesc
-	Core   []MsgDesc
+	Types    map[string]map[string]string
+	Messages map[string][]MsgDesc
 }
 
 type MsgDesc struct {

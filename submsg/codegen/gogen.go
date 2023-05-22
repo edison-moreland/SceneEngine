@@ -11,7 +11,7 @@ import (
 const runtimeImport = "github.com/edison-moreland/SceneEngine/submsg/runtime/go"
 
 type goGen struct {
-	*jen.File
+	j *jen.File
 }
 
 func newGoGen() codegen {
@@ -23,7 +23,7 @@ func newGoGen() codegen {
 }
 
 func (g *goGen) MsgIds(prefix string, messages []MsgDesc) {
-	g.Const().DefsFunc(func(g *jen.Group) {
+	g.j.Const().DefsFunc(func(g *jen.Group) {
 		for i, msg := range messages {
 			g.Id(goMsgId(prefix, msg)).Qual(runtimeImport, "MsgId").Op("=").Lit(i)
 		}
@@ -33,7 +33,7 @@ func (g *goGen) MsgIds(prefix string, messages []MsgDesc) {
 func (g *goGen) Server(prefix string, messages []MsgDesc) {
 	// Server interface
 	serverInterfaceId := goId(true, prefix, "server")
-	g.Type().Id(serverInterfaceId).InterfaceFunc(func(g *jen.Group) {
+	g.j.Type().Id(serverInterfaceId).InterfaceFunc(func(g *jen.Group) {
 		for _, msg := range messages {
 			g.Id(snakeToGoId(true, msg.Name)).
 				Call(jen.Id("body").Id("[]byte")).
@@ -66,7 +66,7 @@ func (g *goGen) Server(prefix string, messages []MsgDesc) {
 
 		}))
 
-	g.Func().
+	g.j.Func().
 		Id(goId(true, prefix, "router")).
 		Params(jen.Id("s").Id(serverInterfaceId)).
 		Qual(runtimeImport, "MsgReceiver").
@@ -76,14 +76,14 @@ func (g *goGen) Server(prefix string, messages []MsgDesc) {
 func (g *goGen) Client(prefix string, messages []MsgDesc) {
 	// Client struct
 	clientId := goId(true, prefix, "client")
-	g.Type().Id(clientId).Struct(
+	g.j.Type().Id(clientId).Struct(
 		jen.Id("s").
 			Qual(runtimeImport, "MsgSender"),
 	)
 
 	// New Client func
 	newClientId := goId(true, "new", prefix, "client")
-	g.Func().Id(newClientId).Params(
+	g.j.Func().Id(newClientId).Params(
 		jen.Id("s").
 			Qual(runtimeImport, "MsgSender"),
 	).Op("*").Id(clientId).Block(
@@ -96,7 +96,7 @@ func (g *goGen) Client(prefix string, messages []MsgDesc) {
 
 	// Function for sending messages
 	for _, msg := range messages {
-		g.Func().Params(
+		g.j.Func().Params(
 			jen.Id("c").Op("*").Id(clientId),
 		).Id(snakeToGoId(true, msg.Name)).Params(
 			jen.Id("b").Id("[]byte"),
@@ -111,8 +111,35 @@ func (g *goGen) Client(prefix string, messages []MsgDesc) {
 	}
 }
 
+func (g *goGen) Type(name string, fields map[string]string) {
+	g.j.Type().
+		Id(snakeToGoId(true, name)).
+		StructFunc(func(g *jen.Group) {
+			for fieldName, fieldType := range fields {
+				g.Id(snakeToGoId(true, fieldName)).Id(submsgTypeToGo(fieldType))
+			}
+		})
+}
+
 func (g *goGen) Done() error {
-	return g.Save(goOutputFile)
+	return g.j.Save(goOutputFile)
+}
+
+func submsgTypeToGo(submsgType string) string {
+	switch submsgType {
+	case "String":
+		return "string"
+	case "Bool":
+		return "bool"
+	case "Int":
+		return "int64"
+	case "Uint":
+		return "uint64"
+	case "Float":
+		return "float64"
+	default:
+		return snakeToGoId(true, submsgType)
+	}
 }
 
 func snakeToGoId(export bool, snake string) string {

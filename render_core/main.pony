@@ -2,6 +2,7 @@ use "messages"
 use "format"
 use "random"
 use "collections"
+use "buffered"
 use "../submsg/runtime/pony"
 
 actor Main is CoreServer
@@ -26,7 +27,10 @@ actor Main is CoreServer
         client.core_info(Marshal(MsgCoreInfo("PonyCore v0.0.1")))
 
     be config(body: Array[U8] iso) =>
-        render_config = Config.unmarshal_msgpack(consume body)
+        let r: Reader = Reader
+        r.append(consume body)
+
+        render_config = UnmarshalMsgPackConfig(consume r)
         env.err.print("PonyCore: render_config x" +
             Format.int[U64](render_config.image_width) + " y" +
             Format.int[U64](render_config.image_height))
@@ -38,7 +42,10 @@ actor Main is CoreServer
 
         for y in Range(0, render_config.image_height.usize()) do
             for x in Range(0, render_config.image_width.usize()) do
-                pixel_buf.push(Pixel(x.u64(), y.u64(), Color(rand.real(), rand.real(), rand.real())))
+                pixel_buf.push(Pixel(where
+                    x' = x.u64(),
+                    y' = y.u64(),
+                    color' = Color(rand.real(), rand.real(), rand.real())))
             end
             client.pixel_batch(Marshal(pixel_buf))
             pixel_buf.clear()
