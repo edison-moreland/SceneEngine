@@ -44,11 +44,15 @@ func main() {
 	renderCore.WaitForReady()
 	logger.Info("Render core ready!", zap.String("version", renderCore.Info()))
 
+	aspectRatio := float64(16.0 / 9.0)
 	width := uint64(800)
-	height := uint64(450)
+	height := uint64(float64(width) / aspectRatio)
 	renderCore.SetConfig(messages.Config{
+		AspectRatio: aspectRatio,
 		ImageWidth:  width,
 		ImageHeight: height,
+		Samples:     50,
+		Depth:       50,
 	})
 	renderCore.WaitForReady()
 	logger.Info("Set config")

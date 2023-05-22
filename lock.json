@@ -1,6 +1,10 @@
 {
   "locks": [
     {
+      "locator": "github.com/ponylang/fork_join.git",
+      "revision": "0.1.1"
+    },
+    {
       "locator": "github.com/seantallen-org/msgpack.git",
       "revision": "0.2.5"
     }

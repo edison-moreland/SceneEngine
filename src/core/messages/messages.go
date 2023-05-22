@@ -91,20 +91,23 @@ func (c *CoreClient) RenderFrame(b []byte) {
 	c.s(CoreMsgRenderFrame, b)
 }
 
-type Pixel struct {
-	X     uint64
-	Y     uint64
-	Color Color
-}
 type MsgCoreInfo struct {
 	Version string
 }
 type Config struct {
+	AspectRatio float64
 	ImageHeight uint64
 	ImageWidth  uint64
+	Samples     uint64
+	Depth       uint64
 }
 type Color struct {
+	B float64
 	R float64
 	G float64
-	B float64
+}
+type Pixel struct {
+	X     uint64
+	Y     uint64
+	Color Color
 }

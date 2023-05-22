@@ -149,8 +149,7 @@ func newPonyGen() codegen {
 					return false
 				}
 			},
-		}).
-		ParseFS(ponyTemplates, "pony_templates/*.tmpl"))
+		}).ParseFS(ponyTemplates, "pony_templates/*.tmpl"))
 
 	return &ponyGen{
 		generatedCode: &b,

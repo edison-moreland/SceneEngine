@@ -78,40 +78,67 @@ actor CoreClient
 
 
 class val Config is MsgPackMarshalable
+    var aspect_ratio: F64
+    var depth: U64
     var image_height: U64
     var image_width: U64
+    var samples: U64
 
     new val create(
+        aspect_ratio': F64,
+        depth': U64,
         image_height': U64,
-        image_width': U64
+        image_width': U64,
+        samples': U64
         ) =>
+        aspect_ratio = aspect_ratio'
+        depth = depth'
         image_height = image_height'
         image_width = image_width'
+        samples = samples'
 
     new val zero() =>
+        aspect_ratio = 0.0
+        depth = 0
         image_height = 0
         image_width = 0
+        samples = 0
 
     fun marshal_msgpack(w: Writer ref)? =>
-        MessagePackEncoder.fixmap(w, 2)?
+        MessagePackEncoder.fixmap(w, 5)?
+        MessagePackEncoder.fixstr(w, "AspectRatio")?
+        MessagePackEncoder.float_64(w, aspect_ratio)
+        MessagePackEncoder.fixstr(w, "Depth")?
+        MessagePackEncoder.uint_64(w, depth)
         MessagePackEncoder.fixstr(w, "ImageHeight")?
         MessagePackEncoder.uint_64(w, image_height)
         MessagePackEncoder.fixstr(w, "ImageWidth")?
         MessagePackEncoder.uint_64(w, image_width)
+        MessagePackEncoder.fixstr(w, "Samples")?
+        MessagePackEncoder.uint_64(w, samples)
 
 primitive UnmarshalMsgPackConfig
     fun apply(r: Reader ref): Config =>
+        var aspect_ratio': F64 = 0.0
+        var depth': U64 = 0
         var image_height': U64 = 0
         var image_width': U64 = 0
+        var samples': U64 = 0
 
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
                 match MessagePackDecoder.fixstr(r)?
+                | "AspectRatio" =>
+                    aspect_ratio' = MessagePackDecoder.f64(r)?
+                | "Depth" =>
+                    depth' = MessagePackDecoder.u64(r)?
                 | "ImageHeight" =>
                     image_height' = MessagePackDecoder.u64(r)?
                 | "ImageWidth" =>
                     image_width' = MessagePackDecoder.u64(r)?
+                | "Samples" =>
+                    samples' = MessagePackDecoder.u64(r)?
                 else
                     Debug("unknown field" where stream = DebugErr)
                 end
@@ -121,8 +148,11 @@ primitive UnmarshalMsgPackConfig
         end
 
         Config(
+        aspect_ratio',
+        depth',
         image_height',
-        image_width'
+        image_width',
+        samples'
         )
 class val Color is MsgPackMarshalable
     var b: F64
