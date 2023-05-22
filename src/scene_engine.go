@@ -68,7 +68,7 @@ func main() {
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
 
-		rl.ClearBackground(rl.RayWhite)
+		rl.ClearBackground(rl.Blue)
 
 		for x := uint64(0); x < width; x++ {
 			for y := uint64(0); y < height; y++ {
@@ -95,12 +95,13 @@ func NewRenderTarget(width uint64, height uint64, pixels <-chan messages.Pixel) 
 		for p := range pixels {
 			// TODO: Make sure pixels are laid out in the same order that they're read back
 			// TODO: Adjust submsg types to use float32
-			r.image[(p.Y*height)+p.X] = rl.ColorFromNormalized(rl.Vector4{
-				X: float32(p.Color.R),
-				Y: float32(p.Color.G),
-				Z: float32(p.Color.B),
-				W: 1,
-			})
+
+			r.image[(p.X*height)+p.Y] = rl.NewColor(
+				p.Color.R,
+				p.Color.G,
+				p.Color.B,
+				255,
+			)
 		}
 	}()
 
@@ -108,7 +109,7 @@ func NewRenderTarget(width uint64, height uint64, pixels <-chan messages.Pixel) 
 }
 
 func (r *renderTarget) Pixel(x, y uint64) (rl.Vector2, rl.Color) {
-	color := r.image[(y*r.height)+x]
+	color := r.image[(x*r.height)+y]
 
 	return rl.Vector2{
 		X: float32(x),

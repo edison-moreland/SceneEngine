@@ -137,6 +137,8 @@ func submsgTypeToGo(submsgType string) string {
 		return "uint64"
 	case "Float":
 		return "float64"
+	case "Byte":
+		return "byte"
 	default:
 		return snakeToGoId(true, submsgType)
 	}

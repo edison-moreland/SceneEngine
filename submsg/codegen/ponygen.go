@@ -91,6 +91,8 @@ func newPonyGen() codegen {
 					return "U64"
 				case "Float":
 					return "F64"
+				case "Byte":
+					return "U8"
 				default:
 					return snakeToGoId(true, submsgType)
 				}
@@ -107,6 +109,8 @@ func newPonyGen() codegen {
 					return "u64"
 				case "Float":
 					return "f64"
+				case "Byte":
+					return "u8"
 				default:
 					return "EEEERRRRROROROROR"
 				}
@@ -123,6 +127,8 @@ func newPonyGen() codegen {
 					return "uint_64"
 				case "Float":
 					return "float_64"
+				case "Byte":
+					return "uint_8"
 				default:
 					return "EEEERRRRROROROROR"
 				}
@@ -133,7 +139,7 @@ func newPonyGen() codegen {
 					return "\"\""
 				case "Bool":
 					return "false"
-				case "Int", "Uint":
+				case "Int", "Uint", "Byte":
 					return "0"
 				case "Float":
 					return "0.0"
@@ -143,7 +149,7 @@ func newPonyGen() codegen {
 			},
 			"isPrimitive": func(t string) bool {
 				switch t {
-				case "String", "Bool", "Int", "Uint", "Float":
+				case "String", "Bool", "Int", "Uint", "Float", "Byte":
 					return true
 				default:
 					return false

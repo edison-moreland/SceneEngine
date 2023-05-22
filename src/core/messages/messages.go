@@ -95,16 +95,16 @@ type MsgCoreInfo struct {
 	Version string
 }
 type Config struct {
+	Depth       uint64
 	AspectRatio float64
 	ImageHeight uint64
 	ImageWidth  uint64
 	Samples     uint64
-	Depth       uint64
 }
 type Color struct {
-	B float64
-	R float64
-	G float64
+	B byte
+	R byte
+	G byte
 }
 type Pixel struct {
 	X     uint64

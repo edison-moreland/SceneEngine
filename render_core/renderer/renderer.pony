@@ -18,7 +18,7 @@ primitive Renderer
         let job = fj.Job[PixelLoc, (PixelLoc,Vec3)](
             WorkerBuilder(config, scene),
             PixelGenerator(config.image_width, config.image_height),
-            RenderTarget(on_pixel, on_complete),
+            RenderTarget(config.image_height, on_pixel, on_complete),
             auth)
         job.start()
 
@@ -52,24 +52,28 @@ class PixelGenerator is fj.Generator[PixelLoc]
 class RenderTarget is fj.Collector[PixelLoc, (PixelLoc,Vec3)]
     let _on_pixel: OnPixelComplete
     let _on_complete: OnRenderComplete
+    let _height: U64
 
-    new iso create(on_pixel: OnPixelComplete, on_complete: OnRenderComplete) =>
+    new iso create(height: U64, on_pixel: OnPixelComplete, on_complete: OnRenderComplete) =>
         _on_pixel = on_pixel
         _on_complete = on_complete
+        _height = height
 
     fun clamp(x: F64, min: F64, max: F64): F64 =>
         x.max(min).min(max) //TODO: Is this right?
 
     fun ref collect(runner: fj.CollectorRunner[PixelLoc, (PixelLoc,Vec3)] ref, result: (PixelLoc,Vec3)) =>
         (let pixel, let color) = result
-    
-        let color' = Color(
-            clamp(color.x.sqrt(), 0.0, 0.999),
-            clamp(color.y.sqrt(), 0.0, 0.999),
-            clamp(color.z.sqrt(), 0.0, 0.999)
+
+        let color' = Color(where
+            r' = (256 * clamp(color.x.sqrt(), 0.0, 0.999)).u8(),
+            g' = (256 * clamp(color.y.sqrt(), 0.0, 0.999)).u8(),
+            b' = (256 * clamp(color.z.sqrt(), 0.0, 0.999)).u8()
         )
 
-        _on_pixel(pixel._1, pixel._2, color')
+        let x = pixel._1
+        let y = (_height-1 - pixel._2)
+        _on_pixel(x, y, color')
 
 
     fun ref finish() =>

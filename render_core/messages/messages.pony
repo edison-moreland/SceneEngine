@@ -77,6 +77,43 @@ actor CoreClient
         send_msg(Core.render_frame(), consume data)
 
 
+class val MsgCoreInfo is MsgPackMarshalable
+    var version: String
+
+    new val create(
+        version': String
+        ) =>
+        version = version'
+
+    new val zero() =>
+        version = ""
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 1)?
+        MessagePackEncoder.fixstr(w, "Version")?
+        MessagePackEncoder.str_8(w, version)?
+
+primitive UnmarshalMsgPackMsgCoreInfo
+    fun apply(r: Reader ref): MsgCoreInfo =>
+        var version': String = ""
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                match MessagePackDecoder.fixstr(r)?
+                | "Version" =>
+                    version' = MessagePackDecoder.str(r)?
+                else
+                    Debug("unknown field" where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        MsgCoreInfo(
+        version'
+        )
 class val Config is MsgPackMarshalable
     var aspect_ratio: F64
     var depth: U64
@@ -155,49 +192,49 @@ primitive UnmarshalMsgPackConfig
         samples'
         )
 class val Color is MsgPackMarshalable
-    var b: F64
-    var g: F64
-    var r: F64
+    var b: U8
+    var g: U8
+    var r: U8
 
     new val create(
-        b': F64,
-        g': F64,
-        r': F64
+        b': U8,
+        g': U8,
+        r': U8
         ) =>
         b = b'
         g = g'
         r = r'
 
     new val zero() =>
-        b = 0.0
-        g = 0.0
-        r = 0.0
+        b = 0
+        g = 0
+        r = 0
 
     fun marshal_msgpack(w: Writer ref)? =>
         MessagePackEncoder.fixmap(w, 3)?
         MessagePackEncoder.fixstr(w, "B")?
-        MessagePackEncoder.float_64(w, b)
+        MessagePackEncoder.uint_8(w, b)
         MessagePackEncoder.fixstr(w, "G")?
-        MessagePackEncoder.float_64(w, g)
+        MessagePackEncoder.uint_8(w, g)
         MessagePackEncoder.fixstr(w, "R")?
-        MessagePackEncoder.float_64(w, r)
+        MessagePackEncoder.uint_8(w, r)
 
 primitive UnmarshalMsgPackColor
     fun apply(r: Reader ref): Color =>
-        var b': F64 = 0.0
-        var g': F64 = 0.0
-        var r': F64 = 0.0
+        var b': U8 = 0
+        var g': U8 = 0
+        var r': U8 = 0
 
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
                 match MessagePackDecoder.fixstr(r)?
                 | "B" =>
-                    b' = MessagePackDecoder.f64(r)?
+                    b' = MessagePackDecoder.u8(r)?
                 | "G" =>
-                    g' = MessagePackDecoder.f64(r)?
+                    g' = MessagePackDecoder.u8(r)?
                 | "R" =>
-                    r' = MessagePackDecoder.f64(r)?
+                    r' = MessagePackDecoder.u8(r)?
                 else
                     Debug("unknown field" where stream = DebugErr)
                 end
@@ -267,41 +304,4 @@ primitive UnmarshalMsgPackPixel
         color',
         x',
         y'
-        )
-class val MsgCoreInfo is MsgPackMarshalable
-    var version: String
-
-    new val create(
-        version': String
-        ) =>
-        version = version'
-
-    new val zero() =>
-        version = ""
-
-    fun marshal_msgpack(w: Writer ref)? =>
-        MessagePackEncoder.fixmap(w, 1)?
-        MessagePackEncoder.fixstr(w, "Version")?
-        MessagePackEncoder.str_8(w, version)?
-
-primitive UnmarshalMsgPackMsgCoreInfo
-    fun apply(r: Reader ref): MsgCoreInfo =>
-        var version': String = ""
-
-        try
-            let map_size = Unmarshal.map(r)?
-            for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
-                | "Version" =>
-                    version' = MessagePackDecoder.str(r)?
-                else
-                    Debug("unknown field" where stream = DebugErr)
-                end
-            end
-        else
-            Debug("Error unmarshalling" where stream = DebugErr)
-        end
-
-        MsgCoreInfo(
-        version'
         )

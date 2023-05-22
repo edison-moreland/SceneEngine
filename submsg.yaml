@@ -1,4 +1,4 @@
-# Builtin types: String, Bool, Int, Uint, Float
+# Builtin types: String, Bool, Int, Uint, Float, Byte
 types:
   msg_core_info:
     version: String
@@ -11,9 +11,9 @@ types:
     depth: Uint
 
   color:
-    r: Float
-    g: Float
-    b: Float
+    r: Byte
+    g: Byte
+    b: Byte
 
   pixel:
     x: Uint
