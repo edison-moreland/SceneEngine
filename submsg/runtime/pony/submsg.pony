@@ -8,7 +8,7 @@ type ReceiveMsg is {(MsgId, Array[U8 val] iso)} val
 
 primitive StartSubMsg
     fun apply(stdin: InputStream, stdout: OutStream, receiver: ReceiveMsg): SendMsg =>
-        stdin(_MsgReceiver(receiver))
+        stdin(_MsgReceiver(receiver) where chunk_size = 512)
         _MsgSender(stdout)~apply()
 
 actor _MsgSender
@@ -51,5 +51,6 @@ class _MsgReceiver is InputNotify
             _receive_msg(msg_id, rb.block(msg_len.usize())?)
         else
             // TODO: handle this. What happens if the chunk we get is too small?
+            Debug("Error in msg receiver!" where stream=DebugErr)
             return
         end

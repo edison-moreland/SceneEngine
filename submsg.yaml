@@ -47,5 +47,8 @@ messages:
     - name: info
       desc: Request that the render core calls engine.core_info
 
+    - name: config
+      desc: Set the config for the next frames
+
     - name: render_frame
       desc: Start rendering the next frame

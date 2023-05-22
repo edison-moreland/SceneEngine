@@ -18,13 +18,12 @@ var (
 )
 
 type MsgId uint32
-type MsgSender func(id MsgId, length uint32, body io.Reader)
+type MsgSender func(id MsgId, body []byte)
 type MsgReceiver func(id MsgId, body []byte) error
 
 type msg struct {
-	id     MsgId
-	length uint32
-	body   io.Reader
+	id   MsgId
+	body []byte
 }
 
 // Start submsg, a framework for communicating with child processes through stdin/out
@@ -51,11 +50,10 @@ func Start(ctx context.Context, bin string, receiver MsgReceiver) (MsgSender, er
 		return nil, err
 	}
 
-	return func(id MsgId, length uint32, body io.Reader) {
+	return func(id MsgId, body []byte) {
 		sendQueue <- msg{
-			id:     id,
-			length: length,
-			body:   body,
+			id:   id,
+			body: body,
 		}
 	}, nil
 }
@@ -74,24 +72,20 @@ func msgSender(ctx context.Context, childIn io.WriteCloser, queue chan msg) {
 				panic(err)
 			}
 
-			err = binary.Write(childIn, byteOrder, msg.length)
+			err = binary.Write(childIn, byteOrder, uint32(len(msg.body)))
 			if err != nil {
 				err = fmt.Errorf("%w: writing msg length to child", err)
 				panic(err)
 			}
 
-			if msg.length <= 0 {
+			if len(msg.body) <= 0 {
 				break
 			}
 
-			bWritten, err := io.CopyN(childIn, msg.body, int64(msg.length))
-			if err != nil {
-				err = fmt.Errorf("%w: writing msg body to child", err)
-				panic(err)
-			}
+			bWritten, err := childIn.Write(msg.body)
 
-			if uint32(bWritten) != msg.length {
-				err = fmt.Errorf("only %d/%d bytes written", bWritten, msg.length)
+			if bWritten != len(msg.body) {
+				err = fmt.Errorf("only %d/%d bytes written", bWritten, len(msg.body))
 				panic(err)
 			}
 		}

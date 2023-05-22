@@ -99,14 +99,12 @@ func (g *goGen) Client(prefix string, messages []MsgDesc) {
 		g.Func().Params(
 			jen.Id("c").Op("*").Id(clientId),
 		).Id(snakeToGoId(true, msg.Name)).Params(
-			jen.Id("l").Uint32(),
-			jen.Id("b").Qual("io", "Reader"),
+			jen.Id("b").Id("[]byte"),
 		).Block(
 			jen.Id("c").
 				Dot("s").
 				Call(
 					jen.Id(goMsgId(prefix, msg)),
-					jen.Id("l"),
 					jen.Id("b"),
 				),
 		)

@@ -4,6 +4,11 @@ type MsgCoreInfo struct {
 	Version string
 }
 
+type Config struct {
+	ImageWidth  uint64
+	ImageHeight uint64
+}
+
 type Color struct {
 	R float64
 	G float64

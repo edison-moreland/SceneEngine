@@ -39,10 +39,12 @@ actor EngineClient
 
 primitive Core
     fun info(): MsgId => 0
-    fun render_frame(): MsgId => 1
+    fun config(): MsgId => 1
+    fun render_frame(): MsgId => 2
 
 interface tag CoreServer
     fun tag info(body: Array[U8] iso)
+    fun tag config(body: Array[U8] iso)
     fun tag render_frame(body: Array[U8] iso)
 
 primitive CoreRouter
@@ -50,6 +52,7 @@ primitive CoreRouter
         {(id: MsgId, body: Array[U8] iso) =>
             match id
             | Core.info() => s.info(consume body)
+            | Core.config() => s.config(consume body)
             | Core.render_frame() => s.render_frame(consume body)
             end
         }
@@ -62,6 +65,9 @@ actor CoreClient
 
     be info(data: (Array[U8 val] iso | None)) =>
         send_msg(Core.info(), consume data)
+
+    be config(data: (Array[U8 val] iso | None)) =>
+        send_msg(Core.config(), consume data)
 
     be render_frame(data: (Array[U8 val] iso | None)) =>
         send_msg(Core.render_frame(), consume data)

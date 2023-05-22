@@ -92,11 +92,20 @@ func (r *RenderCore) WaitForReady() {
 // Info returns the core's info string
 func (r *RenderCore) Info() string {
 	if r.info == "" {
-		r.client.Info(0, nil)
+		r.client.Info(nil)
 
 		<-r.ready
 	}
 	return r.info
+}
+
+func (r *RenderCore) SetConfig(c messages.Config) {
+	body, err := msgpack.Marshal(&c)
+	if err != nil {
+		panic(err)
+	}
+
+	r.client.Config(body)
 }
 
 // StartRender will start rendering the next frame
@@ -105,7 +114,7 @@ func (r *RenderCore) StartRender() <-chan messages.Pixel {
 		r.pixelsOut = make(chan messages.Pixel)
 	}
 
-	r.client.RenderFrame(0, nil)
+	r.client.RenderFrame(nil)
 
 	return r.pixelsOut
 }
