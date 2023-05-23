@@ -41,6 +41,18 @@ func Start(ctx context.Context, path string) (*RenderCore, error) {
 
 // Respond to messages from the core
 
+func (r *RenderCore) Test(body []byte) error {
+	var material messages.Material
+	err := msgpack.Unmarshal(body, &material)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%#v \n", material)
+
+	return nil
+}
+
 func (r *RenderCore) CoreReady(_ []byte) error {
 	// If this channel isn't nil, that means a render is in progress
 	// The core will send the ready message when a render concludes

@@ -34,7 +34,8 @@ type MsgDesc struct {
 }
 
 type TypeDesc struct {
-	Name   string
-	Type   string
-	Fields map[string]string
+	Name    string
+	Type    string
+	Fields  map[string]string
+	Members []string
 }

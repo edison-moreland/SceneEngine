@@ -19,15 +19,22 @@ type ponyGen struct {
 	t *template.Template
 }
 
-type ponyTemplateContext struct {
+type ponyMsgTemplateContext struct {
 	Prefix   string
 	Messages []MsgDesc
 }
 
-type ponyTypeTemplateContext struct {
+type ponyStructTemplateContext struct {
 	Name       string
 	Fields     map[string]string
 	FieldCount int
+}
+
+type ponyOneOfTemplateContext struct {
+	Name          string
+	Members       []string
+	MemberCount   int
+	DefaultMember string
 }
 
 func newPonyGen() codegen {
@@ -163,11 +170,8 @@ func newPonyGen() codegen {
 	}
 }
 
-func (p *ponyGen) tmpl(name string, prefix string, messages []MsgDesc) {
-	err := p.t.ExecuteTemplate(p.generatedCode, name, ponyTemplateContext{
-		Prefix:   prefix,
-		Messages: messages,
-	})
+func (p *ponyGen) tmpl(name string, context any) {
+	err := p.t.ExecuteTemplate(p.generatedCode, name, context)
 
 	if err != nil {
 		panic(err)
@@ -176,33 +180,41 @@ func (p *ponyGen) tmpl(name string, prefix string, messages []MsgDesc) {
 }
 
 func (p *ponyGen) MsgIds(prefix string, messages []MsgDesc) {
-	p.tmpl("msg_ids.tmpl", prefix, messages)
+	p.tmpl("msg_ids.tmpl", ponyMsgTemplateContext{
+		Prefix:   prefix,
+		Messages: messages,
+	})
 }
 
 func (p *ponyGen) Server(prefix string, messages []MsgDesc) {
-	p.tmpl("server.tmpl", prefix, messages)
+	p.tmpl("server.tmpl", ponyMsgTemplateContext{
+		Prefix:   prefix,
+		Messages: messages,
+	})
 }
 
 func (p *ponyGen) Client(prefix string, messages []MsgDesc) {
-	p.tmpl("client.tmpl", prefix, messages)
+	p.tmpl("client.tmpl", ponyMsgTemplateContext{
+		Prefix:   prefix,
+		Messages: messages,
+	})
 }
 
 func (p *ponyGen) Type(t TypeDesc) {
 	switch t.Type {
 	case "struct":
-		p.emitStruct(t)
-	}
-}
-
-func (p *ponyGen) emitStruct(t TypeDesc) {
-	err := p.t.ExecuteTemplate(p.generatedCode, "type.tmpl", ponyTypeTemplateContext{
-		Name:       t.Name,
-		Fields:     t.Fields,
-		FieldCount: len(t.Fields),
-	})
-
-	if err != nil {
-		panic(err)
+		p.tmpl("struct.tmpl", ponyStructTemplateContext{
+			Name:       t.Name,
+			Fields:     t.Fields,
+			FieldCount: len(t.Fields),
+		})
+	case "one_of":
+		p.tmpl("one_of.tmpl", ponyOneOfTemplateContext{
+			Name:          t.Name,
+			Members:       t.Members,
+			MemberCount:   len(t.Members),
+			DefaultMember: t.Members[0],
+		})
 	}
 }
 

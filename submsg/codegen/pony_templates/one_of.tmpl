@@ -1,0 +1,55 @@
+
+class val {{ .Name | ponyType }} is MsgPackMarshalable
+    var one_of: (
+{{- $i := 1 }}
+{{- range $m := .Members }}
+        {{ $m | ponyType }} {{ if ne $i $.MemberCount -}} | {{- end }}
+{{- $i = add $i 1 }}
+{{- end }}
+    )
+
+    new val create(
+        one_of': (
+{{- $i := 1 }}
+{{- range $m := .Members }}
+            {{ $m | ponyType }} {{ if ne $i $.MemberCount -}} | {{- end }}
+{{- $i = add $i 1 }}
+{{- end }}
+            )
+        ) =>
+
+        one_of = one_of'
+
+    new val zero() =>
+        one_of = {{ .DefaultMember | ponyType }}.zero()
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        match one_of
+{{- $i := 0 }}
+{{- range $m := .Members }}
+        | let o: {{ $m | ponyType }} =>
+            MessagePackEncoder.uint_8(w, {{ $i }})
+            o.marshal_msgpack(w)?
+{{- $i = add $i 1 }}
+{{- end }}
+        end
+
+primitive UnmarshalMsgPack{{ .Name | ponyType }}
+    fun apply(r: Reader ref): {{ .Name | ponyType }} =>
+        try
+
+        {{ .Name | ponyType }}(match MessagePackDecoder.u8(r)?
+{{- $i := 0 }}
+{{- range $m := .Members }}
+        | {{ $i }} => UnmarshalMsgPack{{ $m | ponyType }}(r)
+{{- $i = add $i 1 }}
+{{- end }}
+        else
+            Debug("broken oneof" where stream = DebugErr)
+            {{ .DefaultMember | ponyType }}.zero()
+        end)
+
+        else
+            Debug("broken oneof 2" where stream = DebugErr)
+            {{ .Name | ponyType }}.zero()
+        end

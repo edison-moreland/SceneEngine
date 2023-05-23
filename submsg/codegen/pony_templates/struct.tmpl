@@ -1,5 +1,5 @@
 
-class val {{ .Name | snakeToCamel | capitalize }} is MsgPackMarshalable
+class val {{ .Name | ponyType }} is MsgPackMarshalable
 {{- range $name, $type := .Fields }}
     var {{ $name }}: {{ $type | ponyType }}
 {{- end }}
@@ -7,12 +7,8 @@ class val {{ .Name | snakeToCamel | capitalize }} is MsgPackMarshalable
     new val create(
 {{- $i := 1 }}
 {{- range $name, $type := .Fields }}
-{{- if ne $i $.FieldCount }}
-        {{ $name }}': {{ $type | ponyType }},
-{{- else }}
-        {{ $name }}': {{ $type | ponyType }}
-{{- end }}
-        {{- $i = add $i 1 }}
+        {{ $name }}': {{ $type | ponyType }} {{- if ne $i $.FieldCount -}} , {{- end }}
+{{- $i = add $i 1 }}
 {{- end }}
         ) =>
 {{- range $name, $type := .Fields }}
@@ -56,11 +52,11 @@ primitive UnmarshalMsgPack{{ .Name | snakeToCamel | capitalize }}
             for i in Range(0, map_size) do
                 match MessagePackDecoder.fixstr(r)?
 {{- range $name, $type := .Fields }}
-                | "{{ $name | snakeToCamel | capitalize }}" =>
+                | "{{ $name | ponyType }}" =>
 {{- if $type | isPrimitive }}
                     {{ $name }}' = MessagePackDecoder.{{ $type | msgpack_decode }}(r)?
 {{- else }}
-                    {{ $name }}' = UnmarshalMsgPack{{ $name | snakeToCamel | capitalize }}(r)
+                    {{ $name }}' = UnmarshalMsgPack{{ $type | ponyType }}(r)
 {{- end}}
 {{- end }}
                 else
@@ -71,14 +67,10 @@ primitive UnmarshalMsgPack{{ .Name | snakeToCamel | capitalize }}
             Debug("Error unmarshalling" where stream = DebugErr)
         end
 
-        {{ .Name | snakeToCamel | capitalize }}(
+        {{ .Name | ponyType }}(
 {{- $i := 1 }}
 {{- range $name, $type := .Fields }}
-{{- if ne $i $.FieldCount }}
-        {{ $name }}',
-{{- else }}
-        {{ $name }}'
-{{- end }}
-        {{- $i = add $i 1 }}
+        {{ $name }}' {{- if ne $i $.FieldCount -}} , {{- end }}
+{{- $i = add $i 1 }}
 {{- end }}
         )

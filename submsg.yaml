@@ -14,6 +14,29 @@ types:
       samples: Uint
       depth: Uint
 
+  - name: lambert
+    type: struct
+    fields:
+      albedo: color
+
+  - name: metal
+    type: struct
+    fields:
+      albedo: color
+      scatter: Float
+
+  - name: dielectric
+    type: struct
+    fields:
+      index_of_refraction: Float
+
+  - name: material
+    type: one_of
+    members:
+      - lambert
+      - metal
+      - dielectric
+
   - name: color
     type: struct
     fields:

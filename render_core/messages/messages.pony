@@ -191,6 +191,177 @@ primitive UnmarshalMsgPackConfig
         image_width',
         samples'
         )
+class val Lambert is MsgPackMarshalable
+    var albedo: Color
+
+    new val create(
+        albedo': Color
+        ) =>
+        albedo = albedo'
+
+    new val zero() =>
+        albedo = Color.zero()
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 1)?
+        MessagePackEncoder.fixstr(w, "Albedo")?
+        albedo.marshal_msgpack(w)?
+
+primitive UnmarshalMsgPackLambert
+    fun apply(r: Reader ref): Lambert =>
+        var albedo': Color = Color.zero()
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                match MessagePackDecoder.fixstr(r)?
+                | "Albedo" =>
+                    albedo' = UnmarshalMsgPackColor(r)
+                else
+                    Debug("unknown field" where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        Lambert(
+        albedo'
+        )
+class val Metal is MsgPackMarshalable
+    var albedo: Color
+    var scatter: F64
+
+    new val create(
+        albedo': Color,
+        scatter': F64
+        ) =>
+        albedo = albedo'
+        scatter = scatter'
+
+    new val zero() =>
+        albedo = Color.zero()
+        scatter = 0.0
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 2)?
+        MessagePackEncoder.fixstr(w, "Albedo")?
+        albedo.marshal_msgpack(w)?
+        MessagePackEncoder.fixstr(w, "Scatter")?
+        MessagePackEncoder.float_64(w, scatter)
+
+primitive UnmarshalMsgPackMetal
+    fun apply(r: Reader ref): Metal =>
+        var albedo': Color = Color.zero()
+        var scatter': F64 = 0.0
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                match MessagePackDecoder.fixstr(r)?
+                | "Albedo" =>
+                    albedo' = UnmarshalMsgPackColor(r)
+                | "Scatter" =>
+                    scatter' = MessagePackDecoder.f64(r)?
+                else
+                    Debug("unknown field" where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        Metal(
+        albedo',
+        scatter'
+        )
+class val Dielectric is MsgPackMarshalable
+    var index_of_refraction: F64
+
+    new val create(
+        index_of_refraction': F64
+        ) =>
+        index_of_refraction = index_of_refraction'
+
+    new val zero() =>
+        index_of_refraction = 0.0
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 1)?
+        MessagePackEncoder.fixstr(w, "IndexOfRefraction")?
+        MessagePackEncoder.float_64(w, index_of_refraction)
+
+primitive UnmarshalMsgPackDielectric
+    fun apply(r: Reader ref): Dielectric =>
+        var index_of_refraction': F64 = 0.0
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                match MessagePackDecoder.fixstr(r)?
+                | "IndexOfRefraction" =>
+                    index_of_refraction' = MessagePackDecoder.f64(r)?
+                else
+                    Debug("unknown field" where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        Dielectric(
+        index_of_refraction'
+        )
+class val Material is MsgPackMarshalable
+    var one_of: (
+        Lambert |
+        Metal |
+        Dielectric 
+    )
+
+    new val create(
+        one_of': (
+            Lambert |
+            Metal |
+            Dielectric 
+            )
+        ) =>
+
+        one_of = one_of'
+
+    new val zero() =>
+        one_of = Lambert.zero()
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        match one_of
+        | let o: Lambert =>
+            MessagePackEncoder.uint_8(w, 0)
+            o.marshal_msgpack(w)?
+        | let o: Metal =>
+            MessagePackEncoder.uint_8(w, 1)
+            o.marshal_msgpack(w)?
+        | let o: Dielectric =>
+            MessagePackEncoder.uint_8(w, 2)
+            o.marshal_msgpack(w)?
+        end
+
+primitive UnmarshalMsgPackMaterial
+    fun apply(r: Reader ref): Material =>
+        try
+
+        Material(match MessagePackDecoder.u8(r)?
+        | 0 => UnmarshalMsgPackLambert(r)
+        | 1 => UnmarshalMsgPackMetal(r)
+        | 2 => UnmarshalMsgPackDielectric(r)
+        else
+            Debug("broken oneof" where stream = DebugErr)
+            Lambert.zero()
+        end)
+
+        else
+            Debug("broken oneof 2" where stream = DebugErr)
+            Material.zero()
+        end
 class val Color is MsgPackMarshalable
     var b: U8
     var g: U8

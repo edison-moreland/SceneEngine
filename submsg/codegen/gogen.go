@@ -9,6 +9,7 @@ import (
 )
 
 const runtimeImport = "github.com/edison-moreland/SceneEngine/submsg/runtime/go"
+const msgpackImport = "github.com/vmihailenco/msgpack/v5"
 
 type goGen struct {
 	j *jen.File
@@ -115,7 +116,133 @@ func (g *goGen) Type(t TypeDesc) {
 	switch t.Type {
 	case "struct":
 		g.emitStruct(t)
+	case "one_of":
+		g.emitOneOf(t)
 	}
+}
+
+func (g *goGen) emitOneOf(t TypeDesc) {
+	oneOfIdent := snakeToGoId(true, t.Name)
+	g.j.Type().
+		Id(oneOfIdent).
+		Struct(jen.Id("OneOf").Any())
+
+	// Initializer
+	g.j.Func().
+		Id(oneOfIdent + "From").
+		Types(
+			jen.Id("T").
+				UnionFunc(func(g *jen.Group) {
+					for _, v := range t.Members {
+						g.Id(snakeToGoId(true, v))
+					}
+				})).
+		Params(jen.Id("v").Id("T")).
+		Id(oneOfIdent).
+		Block(
+			jen.Return(
+				jen.Id(oneOfIdent).
+					Values(
+						jen.Id("OneOf").
+							Op(":").
+							Id("v"))))
+
+	// Custom msgpack encoder
+	g.j.Func().
+		Params(
+			jen.Id("o").
+				Op("*").
+				Id(oneOfIdent)).
+		Id("EncodeMsgpack").
+		Params(
+			jen.Id("e").
+				Op("*").
+				Qual(msgpackImport, "Encoder")).
+		Error().
+		Block(
+			jen.Var().Err().Error(),
+
+			jen.Switch(jen.Id("o").
+				Dot("OneOf").
+				Dot("(type)")).
+				BlockFunc(func(g *jen.Group) {
+					for i, t := range t.Members {
+						g.Case(jen.Id(snakeToGoId(true, t))).
+							Block(
+								jen.Err().
+									Op("=").
+									Id("e").
+									Dot("EncodeUint8").
+									Call(jen.Lit(i)))
+					}
+					g.Default().
+						Block(
+							jen.Err().
+								Op("=").
+								Qual(runtimeImport, "ErrUnknownOneOfField"))
+				}),
+
+			jen.If(jen.Err().Op("!=").Nil()).
+				Block(jen.Return(jen.Err())),
+
+			jen.Return(
+				jen.Id("e").
+					Dot("Encode").
+					Call(
+						jen.Id("o").
+							Dot("OneOf"))))
+
+	// Custom msgpack decoder
+	g.j.Func().
+		Params(
+			jen.Id("o").
+				Op("*").
+				Id(oneOfIdent)).
+		Id("DecodeMsgpack").
+		Params(
+			jen.Id("d").
+				Op("*").
+				Qual(msgpackImport, "Decoder")).
+		Error().
+		Block(
+			jen.List(jen.Id("t"), jen.Err()).
+				Op(":=").
+				Id("d").
+				Dot("DecodeUint8").
+				Call(),
+
+			jen.If(jen.Err().Op("!=").Nil()).
+				Block(jen.Return(jen.Err())),
+
+			jen.Switch(jen.Id("t")).
+				BlockFunc(func(g *jen.Group) {
+					for i, t := range t.Members {
+						g.Case(jen.Lit(i)).
+							Block(
+								jen.Var().
+									Id("v").
+									Id(snakeToGoId(true, t)),
+
+								jen.Err().
+									Op("=").
+									Id("d").
+									Dot("Decode").
+									Call(jen.Op("&").Id("v")),
+
+								jen.Id("o").
+									Dot("OneOf").
+									Op("=").
+									Id("v"))
+					}
+					g.Default().
+						Block(
+							jen.Err().
+								Op("=").
+								Qual(runtimeImport, "ErrUnknownOneOfField"))
+				}),
+
+			jen.Return(jen.Err()))
+
 }
 
 func (g *goGen) emitStruct(t TypeDesc) {
