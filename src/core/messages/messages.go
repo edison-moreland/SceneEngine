@@ -95,11 +95,11 @@ type MsgCoreInfo struct {
 	Version string
 }
 type Config struct {
+	AspectRatio float64
+	ImageHeight uint64
 	ImageWidth  uint64
 	Samples     uint64
 	Depth       uint64
-	AspectRatio float64
-	ImageHeight uint64
 }
 type Color struct {
 	R byte

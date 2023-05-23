@@ -111,11 +111,18 @@ func (g *goGen) Client(prefix string, messages []MsgDesc) {
 	}
 }
 
-func (g *goGen) Type(name string, fields map[string]string) {
+func (g *goGen) Type(t TypeDesc) {
+	switch t.Type {
+	case "struct":
+		g.emitStruct(t)
+	}
+}
+
+func (g *goGen) emitStruct(t TypeDesc) {
 	g.j.Type().
-		Id(snakeToGoId(true, name)).
+		Id(snakeToGoId(true, t.Name)).
 		StructFunc(func(g *jen.Group) {
-			for fieldName, fieldType := range fields {
+			for fieldName, fieldType := range t.Fields {
 				g.Id(snakeToGoId(true, fieldName)).Id(submsgTypeToGo(fieldType))
 			}
 		})

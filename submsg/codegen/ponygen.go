@@ -187,11 +187,18 @@ func (p *ponyGen) Client(prefix string, messages []MsgDesc) {
 	p.tmpl("client.tmpl", prefix, messages)
 }
 
-func (p *ponyGen) Type(name string, fields map[string]string) {
+func (p *ponyGen) Type(t TypeDesc) {
+	switch t.Type {
+	case "struct":
+		p.emitStruct(t)
+	}
+}
+
+func (p *ponyGen) emitStruct(t TypeDesc) {
 	err := p.t.ExecuteTemplate(p.generatedCode, "type.tmpl", ponyTypeTemplateContext{
-		Name:       name,
-		Fields:     fields,
-		FieldCount: len(fields),
+		Name:       t.Name,
+		Fields:     t.Fields,
+		FieldCount: len(t.Fields),
 	})
 
 	if err != nil {

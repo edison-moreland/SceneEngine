@@ -1,24 +1,32 @@
 # Builtin types: String, Bool, Int, Uint, Float, Byte
 types:
-  msg_core_info:
-    version: String
+  - name: msg_core_info
+    type: struct
+    fields:
+      version: String
 
-  config:
-    aspect_ratio: Float
-    image_height: Uint
-    image_width: Uint
-    samples: Uint
-    depth: Uint
+  - name: config
+    type: struct
+    fields:
+      aspect_ratio: Float
+      image_height: Uint
+      image_width: Uint
+      samples: Uint
+      depth: Uint
 
-  color:
-    r: Byte
-    g: Byte
-    b: Byte
+  - name: color
+    type: struct
+    fields:
+      r: Byte
+      g: Byte
+      b: Byte
 
-  pixel:
-    x: Uint
-    y: Uint
-    color: color
+  - name: pixel
+    type: struct
+    fields:
+      x: Uint
+      y: Uint
+      color: color
 
 messages:
   # engine messages are handled by SceneEngine

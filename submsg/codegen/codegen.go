@@ -42,7 +42,7 @@ type codegen interface {
 	MsgIds(string, []MsgDesc)
 	Server(string, []MsgDesc)
 	Client(string, []MsgDesc)
-	Type(string, map[string]string)
+	Type(desc TypeDesc)
 	Done() error
 }
 
@@ -76,7 +76,7 @@ func generatePackage(desc SubMsgDesc, gen codegen) {
 		gen.Client(prefix, messages)
 	}
 
-	for name, fields := range desc.Types {
-		gen.Type(name, fields)
+	for _, t := range desc.Types {
+		gen.Type(t)
 	}
 }
