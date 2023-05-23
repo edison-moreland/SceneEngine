@@ -121,7 +121,7 @@ class RenderWorker is fj.Worker[PixelLoc, (PixelLoc,Vec3)]
         match _scene.root_object.hit(r, 0.001, F64.max_value())
         | let rec: HitRecord =>  
             // Bounce ray again
-            let next_target: Point3 = rec.p + rec.normal + RandomVec3.unit(_rand)
+            let next_target: Point3 = rec.p + RandomVec3.in_hemisphere(_rand, rec.normal)
             trace(Ray(rec.p, next_target - rec.p), depth-1) * 0.5 
         | None => _scene.sky_color(r)
         end

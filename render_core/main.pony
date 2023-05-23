@@ -52,11 +52,9 @@ actor Main is CoreServer
         client.core_ready(None)
 
     be render_frame(body: Array[U8] iso) =>
-        let scene_origin = Point3(0.0, 0.0, -2.0)
-
         let scene = Scene(HittableList([
-            Sphere(scene_origin+Point3(0.0, 0.0, 0.0), 0.5)
-            Sphere(scene_origin+Point3(0.0, -100.5, 0.0), 100)
+            Sphere(Point3(0.0, 0.0, -1.0), 0.5)
+            Sphere(Point3(0.0, -100.5, -1.0), 100)
         ]), Camera(render_config.aspect_ratio))
 
         let pixel = PixelBatcher(client, 100) // TODO: Best pixel batch size?

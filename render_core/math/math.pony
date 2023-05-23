@@ -18,10 +18,18 @@ primitive RandomVec3
             end
             return p
         end
-        Vec3.zero() 
+        Vec3.zero()
 
     fun unit(rand: Rand): Vec3 =>
         unit_circle(rand).unit()
+
+    fun in_hemisphere(rand: Rand, normal: Vec3): Vec3 =>
+        let in_unit_sphere = unit(rand)
+        if in_unit_sphere.dot(normal) > 0.0 then
+            in_unit_sphere
+        else
+            -in_unit_sphere
+        end
 
 class val Vec3
     let x: F64

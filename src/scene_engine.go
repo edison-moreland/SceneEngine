@@ -45,7 +45,7 @@ func main() {
 	logger.Info("Render core ready!", zap.String("version", renderCore.Info()))
 
 	aspectRatio := float64(16.0 / 9.0)
-	width := uint64(800)
+	width := uint64(400)
 	height := uint64(float64(width) / aspectRatio)
 	renderCore.SetConfig(messages.Config{
 		AspectRatio: aspectRatio,
