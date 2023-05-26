@@ -55,7 +55,6 @@ actor Main is CoreServer
 
         Renderer.render(
             SchedulerInfoAuth(env.root),
-            logger,
             render_config,
             pixel~apply(),
             {()(client) =>

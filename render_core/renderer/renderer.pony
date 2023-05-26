@@ -1,10 +1,6 @@
 use fj = "fork_join"
-use "files"
-use "random"
 use "runtime_info"
-use "format"
 
-use "../logger"
 use "../messages"
 
 type PixelLoc is (U64, U64)
@@ -16,13 +12,13 @@ type JobInput is PixelLoc
 type JobOutput is (PixelLoc, PixelColor)
 
 primitive Renderer
-    fun render(auth: SchedulerInfoAuth val, logger: Logger, config: Config, on_pixel: OnPixelComplete, on_complete: OnRenderComplete) =>
-        let job = fj.Job[JobInput, JobOutput](
+    fun render(auth: SchedulerInfoAuth val, config: Config, on_pixel: OnPixelComplete, on_complete: OnRenderComplete) =>
+        fj.Job[JobInput, JobOutput](
             WorkerBuilder(config),
             PixelGenerator(config.image_width, config.image_height),
             RenderTarget(config.image_height, on_pixel, on_complete),
-            auth)
-        job.start()
+            auth
+        ).start()
 
 class WorkerBuilder is fj.WorkerBuilder[JobInput, JobOutput]
     let _config: Config
@@ -62,6 +58,7 @@ class RenderTarget is fj.Collector[JobInput, JobOutput]
     fun ref collect(runner: fj.CollectorRunner[JobInput, JobOutput] ref, result: JobOutput) =>
         (let pixel, let color) = result
 
+        // Image renders upside-down, so flip it
         let x = pixel._1
         let y = (_height-1 - pixel._2)
         _on_pixel(x, y, color)
