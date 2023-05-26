@@ -1,13 +1,12 @@
-use "messages"
 use "format"
 use "random"
 use "collections"
 use "buffered"
-use "logger"
-use "scene"
-use "renderer"
-use "math"
 use "runtime_info"
+
+use "logger"
+use "renderer"
+use "messages"
 use "../submsg/runtime/pony"
 
 actor Main is CoreServer
@@ -51,29 +50,13 @@ actor Main is CoreServer
 
         client.core_ready(None)
 
-    be scene_test(body: Array[U8] iso) =>
-        let r: Reader = Reader
-        r.append(consume body)
-
-        let scene = UnmarshalMsgPackScene(consume r)
-
-        logger.log(Format.int[USize](scene.objects.size()))
-
-        client.core_ready(None)
-
     be render_frame(body: Array[U8] iso) =>
-        let scene = SScene(HittableList([
-            HSphere(Point3(0.0, 0.0, -1.0), 0.5)
-            HSphere(Point3(0.0, -100.5, -1.0), 100)
-        ]), CCamera(render_config.aspect_ratio))
-
         let pixel = PixelBatcher(client, 100) // TODO: Best pixel batch size?
 
         Renderer.render(
             SchedulerInfoAuth(env.root),
             logger,
             render_config,
-            scene,
             pixel~apply(),
             {()(client) =>
                 pixel.send_batch()
@@ -95,8 +78,16 @@ actor PixelBatcher
         batch_size = batch_size'
         buffer = Array[MsgPackMarshalable](batch_size)
 
-    be apply(x: U64, y: U64, color: Color) =>
-        buffer.push(Pixel(where x' = x, y' = y, color' = color))
+    be apply(x: U64, y: U64, color: PixelColor) =>
+        buffer.push(Pixel(where
+            x' = x,
+            y' = y,
+            color' = Color(where
+                r' = color._1,
+                g' = color._2,
+                b' = color._3
+            )
+        ))
 
         if buffer.size() >= batch_size then
             send_batch()

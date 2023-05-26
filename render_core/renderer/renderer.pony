@@ -5,35 +5,35 @@ use "runtime_info"
 use "format"
 
 use "../logger"
-use "../scene"
-use "../math"
 use "../messages"
 
 type PixelLoc is (U64, U64)
-type OnPixelComplete is {(U64, U64, Color)} val
+type PixelColor is (U8, U8, U8)
+type OnPixelComplete is {(U64, U64, PixelColor)} val
 type OnRenderComplete is {()} val
 
+type JobInput is PixelLoc
+type JobOutput is (PixelLoc, PixelColor)
+
 primitive Renderer
-    fun render(auth: SchedulerInfoAuth val, logger: Logger, config: Config, scene: SScene, on_pixel: OnPixelComplete, on_complete: OnRenderComplete) =>
-        let job = fj.Job[PixelLoc, (PixelLoc,Vec3)](
-            WorkerBuilder(config, scene),
+    fun render(auth: SchedulerInfoAuth val, logger: Logger, config: Config, on_pixel: OnPixelComplete, on_complete: OnRenderComplete) =>
+        let job = fj.Job[JobInput, JobOutput](
+            WorkerBuilder(config),
             PixelGenerator(config.image_width, config.image_height),
             RenderTarget(config.image_height, on_pixel, on_complete),
             auth)
         job.start()
 
-class WorkerBuilder is fj.WorkerBuilder[PixelLoc, (PixelLoc,Vec3)]
+class WorkerBuilder is fj.WorkerBuilder[JobInput, JobOutput]
     let _config: Config
-    let _scene: SScene
 
-    new iso create(config: Config, scene: SScene) =>
+    new iso create(config: Config) =>
         _config = config
-        _scene = scene
 
-    fun ref apply(): fj.Worker[PixelLoc, (PixelLoc,Vec3)] iso^ =>
-        RenderWorker(_config, _scene)
+    fun ref apply(): fj.Worker[JobInput, JobOutput] iso^ =>
+        RenderWorker(_config)
 
-class PixelGenerator is fj.Generator[PixelLoc]
+class PixelGenerator is fj.Generator[JobInput]
     let _iter: PixelIter
 
     new iso create(width: U64, height: U64) =>
@@ -42,14 +42,14 @@ class PixelGenerator is fj.Generator[PixelLoc]
     fun ref init(workers: USize) =>
         None
 
-    fun ref apply(): PixelLoc ? =>
+    fun ref apply(): JobInput ? =>
         if _iter.has_next() then
             _iter.next()
         else
             error
         end
 
-class RenderTarget is fj.Collector[PixelLoc, (PixelLoc,Vec3)]
+class RenderTarget is fj.Collector[JobInput, JobOutput]
     let _on_pixel: OnPixelComplete
     let _on_complete: OnRenderComplete
     let _height: U64
@@ -59,69 +59,25 @@ class RenderTarget is fj.Collector[PixelLoc, (PixelLoc,Vec3)]
         _on_complete = on_complete
         _height = height
 
-    fun clamp(x: F64, min: F64, max: F64): F64 =>
-        x.max(min).min(max) //TODO: Is this right?
-
-    fun ref collect(runner: fj.CollectorRunner[PixelLoc, (PixelLoc,Vec3)] ref, result: (PixelLoc,Vec3)) =>
+    fun ref collect(runner: fj.CollectorRunner[JobInput, JobOutput] ref, result: JobOutput) =>
         (let pixel, let color) = result
-
-        let color' = Color(where
-            r' = (256 * clamp(color.x.sqrt(), 0.0, 0.999)).u8(),
-            g' = (256 * clamp(color.y.sqrt(), 0.0, 0.999)).u8(),
-            b' = (256 * clamp(color.z.sqrt(), 0.0, 0.999)).u8()
-        )
 
         let x = pixel._1
         let y = (_height-1 - pixel._2)
-        _on_pixel(x, y, color')
-
+        _on_pixel(x, y, color)
 
     fun ref finish() =>
         _on_complete()
 
-class RenderWorker is fj.Worker[PixelLoc, (PixelLoc,Vec3)]
-    let _rand: Rand = _rand.create()
-
-    let _config: Config
-    let _scene: SScene
-
+class RenderWorker is fj.Worker[JobInput, JobOutput]
+    var _tracer: Tracer
     var _pixel: PixelLoc = (0, 0)
 
-    new iso create(config: Config, scene: SScene) =>
-        _config = config
-        _scene = scene    
+    new iso create(config: Config) =>
+        _tracer = Tracer(config)
 
-    fun ref receive(pixel: PixelLoc) =>
+    fun ref receive(pixel: JobInput) =>
         _pixel = pixel
 
-    fun ref process(runner: fj.WorkerRunner[PixelLoc, (PixelLoc,Vec3)] ref) =>
-        runner.deliver((_pixel, render_pixel(_pixel._1, _pixel._2)))
-
-    fun ref render_pixel(x: U64, y: U64): Vec3 =>
-        var color = Vec3.zero()
-        var sample: U64 = 0
-        while sample < _config.samples do
-            let u: F64 = (x.f64() + _rand.real()) / (_config.image_width - 1).f64()
-            let v: F64 = (y.f64() + _rand.real()) / (_config.image_height - 1).f64()
-
-            let ray = _scene.camera.get_ray(u, v)
-
-            color = color + trace(ray, _config.depth)
-
-            sample = sample + 1
-        end
-
-        color/_config.samples.f64()
-
-    fun ref trace(r: Ray, depth: U64): Vec3 =>
-        if depth <= 0 then
-            return Vec3.zero()
-        end
-
-        match _scene.root_object.hit(r, 0.001, F64.max_value())
-        | let rec: HitRecord =>  
-            // Bounce ray again
-            let next_target: Point3 = rec.p + RandomVec3.in_hemisphere(_rand, rec.normal)
-            trace(Ray(rec.p, next_target - rec.p), depth-1) * 0.5 
-        | None => _scene.sky_color(r)
-        end
+    fun ref process(runner: fj.WorkerRunner[JobInput, JobOutput] ref) =>
+        runner.deliver((_pixel, _tracer(_pixel)))

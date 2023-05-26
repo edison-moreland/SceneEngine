@@ -45,13 +45,11 @@ primitive Core
     fun info(): MsgId => 0
     fun config(): MsgId => 1
     fun render_frame(): MsgId => 2
-    fun scene_test(): MsgId => 3
 
 interface tag CoreServer
     fun tag info(body: Array[U8] iso)
     fun tag config(body: Array[U8] iso)
     fun tag render_frame(body: Array[U8] iso)
-    fun tag scene_test(body: Array[U8] iso)
 
 primitive CoreRouter
     fun apply(s: CoreServer): ReceiveMsg =>
@@ -60,7 +58,6 @@ primitive CoreRouter
             | Core.info() => s.info(consume body)
             | Core.config() => s.config(consume body)
             | Core.render_frame() => s.render_frame(consume body)
-            | Core.scene_test() => s.scene_test(consume body)
             end
         }
 
@@ -78,9 +75,6 @@ actor CoreClient
 
     be render_frame(data: (Array[U8 val] iso | None)) =>
         send_msg(Core.render_frame(), consume data)
-
-    be scene_test(data: (Array[U8 val] iso | None)) =>
-        send_msg(Core.scene_test(), consume data)
 
 
 class val MsgCoreInfo is MsgPackMarshalable

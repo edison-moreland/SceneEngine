@@ -54,14 +54,12 @@ const (
 	CoreMsgInfo        submsg.MsgId = 0
 	CoreMsgConfig      submsg.MsgId = 1
 	CoreMsgRenderFrame submsg.MsgId = 2
-	CoreMsgSceneTest   submsg.MsgId = 3
 )
 
 type CoreServer interface {
 	Info(body []byte) error
 	Config(body []byte) error
 	RenderFrame(body []byte) error
-	SceneTest(body []byte) error
 }
 
 func CoreRouter(s CoreServer) submsg.MsgReceiver {
@@ -73,8 +71,6 @@ func CoreRouter(s CoreServer) submsg.MsgReceiver {
 			return s.Config(body)
 		case CoreMsgRenderFrame:
 			return s.RenderFrame(body)
-		case CoreMsgSceneTest:
-			return s.SceneTest(body)
 		default:
 			return submsg.ErrMsgIdUnknown
 		}
@@ -96,9 +92,6 @@ func (c *CoreClient) Config(b []byte) {
 }
 func (c *CoreClient) RenderFrame(b []byte) {
 	c.s(CoreMsgRenderFrame, b)
-}
-func (c *CoreClient) SceneTest(b []byte) {
-	c.s(CoreMsgSceneTest, b)
 }
 
 type MsgCoreInfo struct {

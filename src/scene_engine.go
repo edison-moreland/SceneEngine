@@ -57,29 +57,27 @@ func main() {
 	renderCore.WaitForReady()
 	logger.Info("Set config")
 
-	renderCore.SceneTest(defaultScene())
+	rl.InitWindow(int32(width), int32(height), "SceneEngine")
 
-	//rl.InitWindow(int32(width), int32(height), "SceneEngine")
-	//
-	//defer rl.CloseWindow()
-	//rl.SetTargetFPS(60)
-	//
-	//logger.Info("Starting render")
-	//target := NewRenderTarget(width, height, renderCore.StartRender())
-	//
-	//for !rl.WindowShouldClose() {
-	//	rl.BeginDrawing()
-	//
-	//	rl.ClearBackground(rl.Blue)
-	//
-	//	for x := uint64(0); x < width; x++ {
-	//		for y := uint64(0); y < height; y++ {
-	//			rl.DrawPixelV(target.Pixel(x, y))
-	//		}
-	//	}
-	//
-	//	rl.EndDrawing()
-	//}
+	defer rl.CloseWindow()
+	rl.SetTargetFPS(60)
+
+	logger.Info("Starting render")
+	target := NewRenderTarget(width, height, renderCore.StartRender())
+
+	for !rl.WindowShouldClose() {
+		rl.BeginDrawing()
+
+		rl.ClearBackground(rl.Blue)
+
+		for x := uint64(0); x < width; x++ {
+			for y := uint64(0); y < height; y++ {
+				rl.DrawPixelV(target.Pixel(x, y))
+			}
+		}
+
+		rl.EndDrawing()
+	}
 }
 
 type renderTarget struct {

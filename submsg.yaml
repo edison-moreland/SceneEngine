@@ -108,6 +108,3 @@ messages:
 
     - name: render_frame
       desc: Start rendering the next frame
-
-    - name: scene_test
-      desc: Scene test
