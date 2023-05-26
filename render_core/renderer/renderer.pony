@@ -3,6 +3,10 @@ use "runtime_info"
 
 use "../messages"
 
+// Renderer is the interface between tracer and the outside world
+// It orchestrates the render job for one image, calling tracer for every pixel, tracking progress, etc
+// This is all plumbing, none of the actual tracing is done here
+
 type PixelLoc is (U64, U64)
 type PixelColor is (U8, U8, U8)
 type OnPixelComplete is {(U64, U64, PixelColor)} val
@@ -30,20 +34,34 @@ class WorkerBuilder is fj.WorkerBuilder[JobInput, JobOutput]
         RenderWorker(_config)
 
 class PixelGenerator is fj.Generator[JobInput]
-    let _iter: PixelIter
+    let _width: U64
+    let _height: U64
+
+    var _x: U64 = 0
+    var _y: U64 = 0
 
     new iso create(width: U64, height: U64) =>
-        _iter = PixelIter(width, height)
+        _width = width
+        _height = height
 
     fun ref init(workers: USize) =>
         None
 
     fun ref apply(): JobInput ? =>
-        if _iter.has_next() then
-            _iter.next()
+        let res: JobInput = (_x, _y)
+
+        if (_x+1) == _width then
+            _x = 0
+            _y = _y + 1
         else
+            _x = _x + 1
+        end
+
+        if _y == _height then
             error
         end
+
+        res
 
 class RenderTarget is fj.Collector[JobInput, JobOutput]
     let _on_pixel: OnPixelComplete
