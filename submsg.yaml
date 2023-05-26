@@ -14,6 +14,27 @@ types:
       samples: Uint
       depth: Uint
 
+  - name: position
+    type: struct
+    fields:
+      x: Float
+      y: Float
+      z: Float
+
+  - name: color
+    type: struct
+    fields:
+      r: Byte
+      g: Byte
+      b: Byte
+
+  - name: pixel
+    type: struct
+    fields:
+      x: Uint
+      y: Uint
+      color: color
+
   - name: lambert
     type: struct
     fields:
@@ -37,19 +58,33 @@ types:
       - metal
       - dielectric
 
-  - name: color
+  - name: sphere
     type: struct
     fields:
-      r: Byte
-      g: Byte
-      b: Byte
+      origin: position
+      radius: Float
 
-  - name: pixel
+  - name: shape
+    type: one_of
+    members:
+      - sphere
+
+  - name: object
     type: struct
     fields:
-      x: Uint
-      y: Uint
-      color: color
+      shape: shape
+      material: material
+
+  - name: camera
+    type: struct
+    fields:
+      origin: position
+
+  - name: scene
+    type: struct
+    fields:
+      objects: '[]object'
+      camera: camera
 
 messages:
   # engine messages are handled by SceneEngine
@@ -73,3 +108,6 @@ messages:
 
     - name: render_frame
       desc: Start rendering the next frame
+
+    - name: scene_test
+      desc: Scene test

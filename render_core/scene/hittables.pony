@@ -48,7 +48,7 @@ class val HittableList is Hittable
         hit_record
 
 
-class val Sphere is Hittable
+class val HSphere is Hittable
     let center: Point3
     let radius: F64
 

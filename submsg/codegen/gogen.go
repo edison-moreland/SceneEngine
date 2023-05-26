@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -246,11 +248,17 @@ func (g *goGen) emitOneOf(t TypeDesc) {
 }
 
 func (g *goGen) emitStruct(t TypeDesc) {
+	sortedFields := []string{}
+	for n, _ := range t.Fields {
+		sortedFields = append(sortedFields, n)
+	}
+	sort.Strings(sortedFields)
+
 	g.j.Type().
 		Id(snakeToGoId(true, t.Name)).
 		StructFunc(func(g *jen.Group) {
-			for fieldName, fieldType := range t.Fields {
-				g.Id(snakeToGoId(true, fieldName)).Id(submsgTypeToGo(fieldType))
+			for _, name := range sortedFields {
+				g.Id(snakeToGoId(true, name)).Id(submsgTypeToGo(t.Fields[name]))
 			}
 		})
 }
@@ -274,6 +282,10 @@ func submsgTypeToGo(submsgType string) string {
 	case "Byte":
 		return "byte"
 	default:
+		if realType, ok := strings.CutPrefix(submsgType, "[]"); ok {
+			return fmt.Sprintf("[]%s", snakeToGoId(true, realType))
+		}
+
 		return snakeToGoId(true, submsgType)
 	}
 }

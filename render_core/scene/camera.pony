@@ -1,6 +1,6 @@
 use "../math"
 
-class val Camera
+class val CCamera
     let origin: Point3
     let lower_left_corner: Point3
     let horizontal: Vec3

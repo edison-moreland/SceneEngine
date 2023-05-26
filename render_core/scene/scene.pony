@@ -1,10 +1,10 @@
 use "../math"
 
-class val Scene
+class val SScene
     let root_object: Hittable
-    let camera: Camera
+    let camera: CCamera
 
-    new val create(root_object': Hittable, camera': Camera) =>
+    new val create(root_object': Hittable, camera': CCamera) =>
         root_object = root_object'
         camera = camera'
 

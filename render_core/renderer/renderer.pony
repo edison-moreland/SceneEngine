@@ -14,7 +14,7 @@ type OnPixelComplete is {(U64, U64, Color)} val
 type OnRenderComplete is {()} val
 
 primitive Renderer
-    fun render(auth: SchedulerInfoAuth val, logger: Logger, config: Config, scene: Scene, on_pixel: OnPixelComplete, on_complete: OnRenderComplete) =>
+    fun render(auth: SchedulerInfoAuth val, logger: Logger, config: Config, scene: SScene, on_pixel: OnPixelComplete, on_complete: OnRenderComplete) =>
         let job = fj.Job[PixelLoc, (PixelLoc,Vec3)](
             WorkerBuilder(config, scene),
             PixelGenerator(config.image_width, config.image_height),
@@ -24,9 +24,9 @@ primitive Renderer
 
 class WorkerBuilder is fj.WorkerBuilder[PixelLoc, (PixelLoc,Vec3)]
     let _config: Config
-    let _scene: Scene
+    let _scene: SScene
 
-    new iso create(config: Config, scene: Scene) =>
+    new iso create(config: Config, scene: SScene) =>
         _config = config
         _scene = scene
 
@@ -83,11 +83,11 @@ class RenderWorker is fj.Worker[PixelLoc, (PixelLoc,Vec3)]
     let _rand: Rand = _rand.create()
 
     let _config: Config
-    let _scene: Scene
+    let _scene: SScene
 
     var _pixel: PixelLoc = (0, 0)
 
-    new iso create(config: Config, scene: Scene) =>
+    new iso create(config: Config, scene: SScene) =>
         _config = config
         _scene = scene    
 

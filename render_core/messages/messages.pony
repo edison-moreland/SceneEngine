@@ -45,11 +45,13 @@ primitive Core
     fun info(): MsgId => 0
     fun config(): MsgId => 1
     fun render_frame(): MsgId => 2
+    fun scene_test(): MsgId => 3
 
 interface tag CoreServer
     fun tag info(body: Array[U8] iso)
     fun tag config(body: Array[U8] iso)
     fun tag render_frame(body: Array[U8] iso)
+    fun tag scene_test(body: Array[U8] iso)
 
 primitive CoreRouter
     fun apply(s: CoreServer): ReceiveMsg =>
@@ -58,6 +60,7 @@ primitive CoreRouter
             | Core.info() => s.info(consume body)
             | Core.config() => s.config(consume body)
             | Core.render_frame() => s.render_frame(consume body)
+            | Core.scene_test() => s.scene_test(consume body)
             end
         }
 
@@ -75,6 +78,9 @@ actor CoreClient
 
     be render_frame(data: (Array[U8 val] iso | None)) =>
         send_msg(Core.render_frame(), consume data)
+
+    be scene_test(data: (Array[U8 val] iso | None)) =>
+        send_msg(Core.scene_test(), consume data)
 
 
 class val MsgCoreInfo is MsgPackMarshalable
@@ -190,6 +196,177 @@ primitive UnmarshalMsgPackConfig
         image_height',
         image_width',
         samples'
+        )
+class val Position is MsgPackMarshalable
+    var x: F64
+    var y: F64
+    var z: F64
+
+    new val create(
+        x': F64,
+        y': F64,
+        z': F64
+        ) =>
+        x = x'
+        y = y'
+        z = z'
+
+    new val zero() =>
+        x = 0.0
+        y = 0.0
+        z = 0.0
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 3)?
+        MessagePackEncoder.fixstr(w, "X")?
+        MessagePackEncoder.float_64(w, x)
+        MessagePackEncoder.fixstr(w, "Y")?
+        MessagePackEncoder.float_64(w, y)
+        MessagePackEncoder.fixstr(w, "Z")?
+        MessagePackEncoder.float_64(w, z)
+
+primitive UnmarshalMsgPackPosition
+    fun apply(r: Reader ref): Position =>
+        var x': F64 = 0.0
+        var y': F64 = 0.0
+        var z': F64 = 0.0
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                match MessagePackDecoder.fixstr(r)?
+                | "X" =>
+                    x' = MessagePackDecoder.f64(r)?
+                | "Y" =>
+                    y' = MessagePackDecoder.f64(r)?
+                | "Z" =>
+                    z' = MessagePackDecoder.f64(r)?
+                else
+                    Debug("unknown field" where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        Position(
+        x',
+        y',
+        z'
+        )
+class val Color is MsgPackMarshalable
+    var b: U8
+    var g: U8
+    var r: U8
+
+    new val create(
+        b': U8,
+        g': U8,
+        r': U8
+        ) =>
+        b = b'
+        g = g'
+        r = r'
+
+    new val zero() =>
+        b = 0
+        g = 0
+        r = 0
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 3)?
+        MessagePackEncoder.fixstr(w, "B")?
+        MessagePackEncoder.uint_8(w, b)
+        MessagePackEncoder.fixstr(w, "G")?
+        MessagePackEncoder.uint_8(w, g)
+        MessagePackEncoder.fixstr(w, "R")?
+        MessagePackEncoder.uint_8(w, r)
+
+primitive UnmarshalMsgPackColor
+    fun apply(r: Reader ref): Color =>
+        var b': U8 = 0
+        var g': U8 = 0
+        var r': U8 = 0
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                match MessagePackDecoder.fixstr(r)?
+                | "B" =>
+                    b' = MessagePackDecoder.u8(r)?
+                | "G" =>
+                    g' = MessagePackDecoder.u8(r)?
+                | "R" =>
+                    r' = MessagePackDecoder.u8(r)?
+                else
+                    Debug("unknown field" where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        Color(
+        b',
+        g',
+        r'
+        )
+class val Pixel is MsgPackMarshalable
+    var color: Color
+    var x: U64
+    var y: U64
+
+    new val create(
+        color': Color,
+        x': U64,
+        y': U64
+        ) =>
+        color = color'
+        x = x'
+        y = y'
+
+    new val zero() =>
+        color = Color.zero()
+        x = 0
+        y = 0
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 3)?
+        MessagePackEncoder.fixstr(w, "Color")?
+        color.marshal_msgpack(w)?
+        MessagePackEncoder.fixstr(w, "X")?
+        MessagePackEncoder.uint_64(w, x)
+        MessagePackEncoder.fixstr(w, "Y")?
+        MessagePackEncoder.uint_64(w, y)
+
+primitive UnmarshalMsgPackPixel
+    fun apply(r: Reader ref): Pixel =>
+        var color': Color = Color.zero()
+        var x': U64 = 0
+        var y': U64 = 0
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                match MessagePackDecoder.fixstr(r)?
+                | "Color" =>
+                    color' = UnmarshalMsgPackColor(r)
+                | "X" =>
+                    x' = MessagePackDecoder.u64(r)?
+                | "Y" =>
+                    y' = MessagePackDecoder.u64(r)?
+                else
+                    Debug("unknown field" where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        Pixel(
+        color',
+        x',
+        y'
         )
 class val Lambert is MsgPackMarshalable
     var albedo: Color
@@ -362,50 +539,41 @@ primitive UnmarshalMsgPackMaterial
             Debug("broken oneof 2" where stream = DebugErr)
             Material.zero()
         end
-class val Color is MsgPackMarshalable
-    var b: U8
-    var g: U8
-    var r: U8
+class val Sphere is MsgPackMarshalable
+    var origin: Position
+    var radius: F64
 
     new val create(
-        b': U8,
-        g': U8,
-        r': U8
+        origin': Position,
+        radius': F64
         ) =>
-        b = b'
-        g = g'
-        r = r'
+        origin = origin'
+        radius = radius'
 
     new val zero() =>
-        b = 0
-        g = 0
-        r = 0
+        origin = Position.zero()
+        radius = 0.0
 
     fun marshal_msgpack(w: Writer ref)? =>
-        MessagePackEncoder.fixmap(w, 3)?
-        MessagePackEncoder.fixstr(w, "B")?
-        MessagePackEncoder.uint_8(w, b)
-        MessagePackEncoder.fixstr(w, "G")?
-        MessagePackEncoder.uint_8(w, g)
-        MessagePackEncoder.fixstr(w, "R")?
-        MessagePackEncoder.uint_8(w, r)
+        MessagePackEncoder.fixmap(w, 2)?
+        MessagePackEncoder.fixstr(w, "Origin")?
+        origin.marshal_msgpack(w)?
+        MessagePackEncoder.fixstr(w, "Radius")?
+        MessagePackEncoder.float_64(w, radius)
 
-primitive UnmarshalMsgPackColor
-    fun apply(r: Reader ref): Color =>
-        var b': U8 = 0
-        var g': U8 = 0
-        var r': U8 = 0
+primitive UnmarshalMsgPackSphere
+    fun apply(r: Reader ref): Sphere =>
+        var origin': Position = Position.zero()
+        var radius': F64 = 0.0
 
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
                 match MessagePackDecoder.fixstr(r)?
-                | "B" =>
-                    b' = MessagePackDecoder.u8(r)?
-                | "G" =>
-                    g' = MessagePackDecoder.u8(r)?
-                | "R" =>
-                    r' = MessagePackDecoder.u8(r)?
+                | "Origin" =>
+                    origin' = UnmarshalMsgPackPosition(r)
+                | "Radius" =>
+                    radius' = MessagePackDecoder.f64(r)?
                 else
                     Debug("unknown field" where stream = DebugErr)
                 end
@@ -414,55 +582,83 @@ primitive UnmarshalMsgPackColor
             Debug("Error unmarshalling" where stream = DebugErr)
         end
 
-        Color(
-        b',
-        g',
-        r'
+        Sphere(
+        origin',
+        radius'
         )
-class val Pixel is MsgPackMarshalable
-    var color: Color
-    var x: U64
-    var y: U64
+class val Shape is MsgPackMarshalable
+    var one_of: (
+        Sphere 
+    )
 
     new val create(
-        color': Color,
-        x': U64,
-        y': U64
+        one_of': (
+            Sphere 
+            )
         ) =>
-        color = color'
-        x = x'
-        y = y'
+
+        one_of = one_of'
 
     new val zero() =>
-        color = Color.zero()
-        x = 0
-        y = 0
+        one_of = Sphere.zero()
 
     fun marshal_msgpack(w: Writer ref)? =>
-        MessagePackEncoder.fixmap(w, 3)?
-        MessagePackEncoder.fixstr(w, "Color")?
-        color.marshal_msgpack(w)?
-        MessagePackEncoder.fixstr(w, "X")?
-        MessagePackEncoder.uint_64(w, x)
-        MessagePackEncoder.fixstr(w, "Y")?
-        MessagePackEncoder.uint_64(w, y)
+        match one_of
+        | let o: Sphere =>
+            MessagePackEncoder.uint_8(w, 0)
+            o.marshal_msgpack(w)?
+        end
 
-primitive UnmarshalMsgPackPixel
-    fun apply(r: Reader ref): Pixel =>
-        var color': Color = Color.zero()
-        var x': U64 = 0
-        var y': U64 = 0
+primitive UnmarshalMsgPackShape
+    fun apply(r: Reader ref): Shape =>
+        try
+
+        Shape(match MessagePackDecoder.u8(r)?
+        | 0 => UnmarshalMsgPackSphere(r)
+        else
+            Debug("broken oneof" where stream = DebugErr)
+            Sphere.zero()
+        end)
+
+        else
+            Debug("broken oneof 2" where stream = DebugErr)
+            Shape.zero()
+        end
+class val Object is MsgPackMarshalable
+    var material: Material
+    var shape: Shape
+
+    new val create(
+        material': Material,
+        shape': Shape
+        ) =>
+        material = material'
+        shape = shape'
+
+    new val zero() =>
+        material = Material.zero()
+        shape = Shape.zero()
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 2)?
+        MessagePackEncoder.fixstr(w, "Material")?
+        material.marshal_msgpack(w)?
+        MessagePackEncoder.fixstr(w, "Shape")?
+        shape.marshal_msgpack(w)?
+
+primitive UnmarshalMsgPackObject
+    fun apply(r: Reader ref): Object =>
+        var material': Material = Material.zero()
+        var shape': Shape = Shape.zero()
 
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
                 match MessagePackDecoder.fixstr(r)?
-                | "Color" =>
-                    color' = UnmarshalMsgPackColor(r)
-                | "X" =>
-                    x' = MessagePackDecoder.u64(r)?
-                | "Y" =>
-                    y' = MessagePackDecoder.u64(r)?
+                | "Material" =>
+                    material' = UnmarshalMsgPackMaterial(r)
+                | "Shape" =>
+                    shape' = UnmarshalMsgPackShape(r)
                 else
                     Debug("unknown field" where stream = DebugErr)
                 end
@@ -471,8 +667,94 @@ primitive UnmarshalMsgPackPixel
             Debug("Error unmarshalling" where stream = DebugErr)
         end
 
-        Pixel(
-        color',
-        x',
-        y'
+        Object(
+        material',
+        shape'
+        )
+class val Camera is MsgPackMarshalable
+    var origin: Position
+
+    new val create(
+        origin': Position
+        ) =>
+        origin = origin'
+
+    new val zero() =>
+        origin = Position.zero()
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 1)?
+        MessagePackEncoder.fixstr(w, "Origin")?
+        origin.marshal_msgpack(w)?
+
+primitive UnmarshalMsgPackCamera
+    fun apply(r: Reader ref): Camera =>
+        var origin': Position = Position.zero()
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                match MessagePackDecoder.fixstr(r)?
+                | "Origin" =>
+                    origin' = UnmarshalMsgPackPosition(r)
+                else
+                    Debug("unknown field" where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        Camera(
+        origin'
+        )
+class val Scene is MsgPackMarshalable
+    var camera: Camera
+    var objects: Array[Object] val
+
+    new val create(
+        camera': Camera,
+        objects': Array[Object] val
+        ) =>
+        camera = camera'
+        objects = objects'
+
+    new val zero() =>
+        camera = Camera.zero()
+        objects = Array[Object]
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 2)?
+        MessagePackEncoder.fixstr(w, "Camera")?
+        camera.marshal_msgpack(w)?
+        MessagePackEncoder.fixstr(w, "Objects")?
+        Marshal.array_header(w, objects.size())?
+        for item' in objects.values() do
+            item'.marshal_msgpack(w)?
+        end
+
+primitive UnmarshalMsgPackScene
+    fun apply(r: Reader ref): Scene =>
+        var camera': Camera = Camera.zero()
+        var objects': Array[Object] val = Array[Object]
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                match MessagePackDecoder.fixstr(r)?
+                | "Camera" =>
+                    camera' = UnmarshalMsgPackCamera(r)
+                | "Objects" =>
+                    objects' = Unmarshal.array[Object](r, UnmarshalMsgPackObject~apply())?
+                else
+                    Debug("unknown field" where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        Scene(
+        camera',
+        consume objects'
         )

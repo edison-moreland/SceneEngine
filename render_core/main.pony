@@ -51,11 +51,21 @@ actor Main is CoreServer
 
         client.core_ready(None)
 
+    be scene_test(body: Array[U8] iso) =>
+        let r: Reader = Reader
+        r.append(consume body)
+
+        let scene = UnmarshalMsgPackScene(consume r)
+
+        logger.log(Format.int[USize](scene.objects.size()))
+
+        client.core_ready(None)
+
     be render_frame(body: Array[U8] iso) =>
-        let scene = Scene(HittableList([
-            Sphere(Point3(0.0, 0.0, -1.0), 0.5)
-            Sphere(Point3(0.0, -100.5, -1.0), 100)
-        ]), Camera(render_config.aspect_ratio))
+        let scene = SScene(HittableList([
+            HSphere(Point3(0.0, 0.0, -1.0), 0.5)
+            HSphere(Point3(0.0, -100.5, -1.0), 100)
+        ]), CCamera(render_config.aspect_ratio))
 
         let pixel = PixelBatcher(client, 100) // TODO: Best pixel batch size?
 

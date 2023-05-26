@@ -1,13 +1,21 @@
 
 class val {{ .Name | ponyType }} is MsgPackMarshalable
 {{- range $name, $type := .Fields }}
+{{- if $type | isArray }}
+    var {{ $name }}: {{ $type | ponyType }} val
+{{- else }}
     var {{ $name }}: {{ $type | ponyType }}
+{{- end}}
 {{- end }}
 
     new val create(
 {{- $i := 1 }}
 {{- range $name, $type := .Fields }}
-        {{ $name }}': {{ $type | ponyType }} {{- if ne $i $.FieldCount -}} , {{- end }}
+{{- if $type | isArray }}
+        {{ $name }}': {{ $type | ponyType }} val
+{{- else }}
+        {{ $name }}': {{ $type | ponyType }}
+{{- end }} {{- if ne $i $.FieldCount -}} , {{- end }}
 {{- $i = add $i 1 }}
 {{- end }}
         ) =>
@@ -17,11 +25,7 @@ class val {{ .Name | ponyType }} is MsgPackMarshalable
 
     new val zero() =>
 {{- range $name, $type := .Fields }}
-{{- if $type | isPrimitive }}
         {{ $name }} = {{ $type | zeroVal }}
-{{- else }}
-        {{ $name }} = {{ $type | ponyType }}.zero()
-{{- end}}
 {{- end}}
 
     fun marshal_msgpack(w: Writer ref)? =>
@@ -32,6 +36,11 @@ class val {{ .Name | ponyType }} is MsgPackMarshalable
         MessagePackEncoder.{{ $type | msgpack }}(w, {{ $name }})?
 {{- else if $type | isPrimitive }}
         MessagePackEncoder.{{ $type | msgpack }}(w, {{ $name }})
+{{- else if $type | isArray }}
+        Marshal.array_header(w, {{ $name }}.size())?
+        for item' in {{ $name }}.values() do
+            item'.marshal_msgpack(w)?
+        end
 {{- else }}
         {{ $name }}.marshal_msgpack(w)?
 {{- end}}
@@ -40,12 +49,12 @@ class val {{ .Name | ponyType }} is MsgPackMarshalable
 primitive UnmarshalMsgPack{{ .Name | snakeToCamel | capitalize }}
     fun apply(r: Reader ref): {{ .Name | snakeToCamel | capitalize }} =>
 {{- range $name, $type := .Fields }}
-{{- if $type | isPrimitive }}
-        var {{ $name }}': {{ $type | ponyType }} = {{ $type | zeroVal }}
+{{- if $type | isArray }}
+        var {{ $name }}': {{ $type | ponyType }} val = {{ $type | zeroVal }}
 {{- else }}
-        var {{ $name }}': {{ $type | ponyType }} = {{ $type | ponyType }}.zero()
-{{- end}}
-{{- end}}
+        var {{ $name }}': {{ $type | ponyType }} = {{ $type | zeroVal }}
+{{- end }}
+{{- end }}
 
         try
             let map_size = Unmarshal.map(r)?
@@ -55,6 +64,8 @@ primitive UnmarshalMsgPack{{ .Name | snakeToCamel | capitalize }}
                 | "{{ $name | ponyType }}" =>
 {{- if $type | isPrimitive }}
                     {{ $name }}' = MessagePackDecoder.{{ $type | msgpack_decode }}(r)?
+{{- else if $type | isArray }}
+                    {{ $name }}' = Unmarshal.array[{{ $type | arrayType }}](r, UnmarshalMsgPack{{ $type | arrayType }}~apply())?
 {{- else }}
                     {{ $name }}' = UnmarshalMsgPack{{ $type | ponyType }}(r)
 {{- end}}
@@ -70,7 +81,11 @@ primitive UnmarshalMsgPack{{ .Name | snakeToCamel | capitalize }}
         {{ .Name | ponyType }}(
 {{- $i := 1 }}
 {{- range $name, $type := .Fields }}
-        {{ $name }}' {{- if ne $i $.FieldCount -}} , {{- end }}
+{{- if $type | isArray }}
+        consume {{ $name }}'
+{{- else }}
+        {{ $name }}'
+{{- end }} {{- if ne $i $.FieldCount -}} , {{- end }}
 {{- $i = add $i 1 }}
 {{- end }}
         )

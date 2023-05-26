@@ -54,12 +54,14 @@ const (
 	CoreMsgInfo        submsg.MsgId = 0
 	CoreMsgConfig      submsg.MsgId = 1
 	CoreMsgRenderFrame submsg.MsgId = 2
+	CoreMsgSceneTest   submsg.MsgId = 3
 )
 
 type CoreServer interface {
 	Info(body []byte) error
 	Config(body []byte) error
 	RenderFrame(body []byte) error
+	SceneTest(body []byte) error
 }
 
 func CoreRouter(s CoreServer) submsg.MsgReceiver {
@@ -71,6 +73,8 @@ func CoreRouter(s CoreServer) submsg.MsgReceiver {
 			return s.Config(body)
 		case CoreMsgRenderFrame:
 			return s.RenderFrame(body)
+		case CoreMsgSceneTest:
+			return s.SceneTest(body)
 		default:
 			return submsg.ErrMsgIdUnknown
 		}
@@ -93,16 +97,34 @@ func (c *CoreClient) Config(b []byte) {
 func (c *CoreClient) RenderFrame(b []byte) {
 	c.s(CoreMsgRenderFrame, b)
 }
+func (c *CoreClient) SceneTest(b []byte) {
+	c.s(CoreMsgSceneTest, b)
+}
 
 type MsgCoreInfo struct {
 	Version string
 }
 type Config struct {
 	AspectRatio float64
+	Depth       uint64
 	ImageHeight uint64
 	ImageWidth  uint64
 	Samples     uint64
-	Depth       uint64
+}
+type Position struct {
+	X float64
+	Y float64
+	Z float64
+}
+type Color struct {
+	B byte
+	G byte
+	R byte
+}
+type Pixel struct {
+	Color Color
+	X     uint64
+	Y     uint64
 }
 type Lambert struct {
 	Albedo Color
@@ -162,13 +184,54 @@ func (o *Material) DecodeMsgpack(d *v5.Decoder) error {
 	return err
 }
 
-type Color struct {
-	R byte
-	G byte
-	B byte
+type Sphere struct {
+	Origin Position
+	Radius float64
 }
-type Pixel struct {
-	Color Color
-	X     uint64
-	Y     uint64
+type Shape struct {
+	OneOf any
+}
+
+func ShapeFrom[T Sphere](v T) Shape {
+	return Shape{OneOf: v}
+}
+func (o *Shape) EncodeMsgpack(e *v5.Encoder) error {
+	var err error
+	switch o.OneOf.(type) {
+	case Sphere:
+		err = e.EncodeUint8(0)
+	default:
+		err = submsg.ErrUnknownOneOfField
+	}
+	if err != nil {
+		return err
+	}
+	return e.Encode(o.OneOf)
+}
+func (o *Shape) DecodeMsgpack(d *v5.Decoder) error {
+	t, err := d.DecodeUint8()
+	if err != nil {
+		return err
+	}
+	switch t {
+	case 0:
+		var v Sphere
+		err = d.Decode(&v)
+		o.OneOf = v
+	default:
+		err = submsg.ErrUnknownOneOfField
+	}
+	return err
+}
+
+type Object struct {
+	Material Material
+	Shape    Shape
+}
+type Camera struct {
+	Origin Position
+}
+type Scene struct {
+	Camera  Camera
+	Objects []Object
 }

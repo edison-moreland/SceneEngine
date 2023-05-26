@@ -57,33 +57,133 @@ func main() {
 	renderCore.WaitForReady()
 	logger.Info("Set config")
 
-	rl.InitWindow(int32(width), int32(height), "SceneEngine")
+	renderCore.SceneTest(defaultScene())
 
-	defer rl.CloseWindow()
-	rl.SetTargetFPS(60)
-
-	logger.Info("Starting render")
-	target := NewRenderTarget(width, height, renderCore.StartRender())
-
-	for !rl.WindowShouldClose() {
-		rl.BeginDrawing()
-
-		rl.ClearBackground(rl.Blue)
-
-		for x := uint64(0); x < width; x++ {
-			for y := uint64(0); y < height; y++ {
-				rl.DrawPixelV(target.Pixel(x, y))
-			}
-		}
-
-		rl.EndDrawing()
-	}
+	//rl.InitWindow(int32(width), int32(height), "SceneEngine")
+	//
+	//defer rl.CloseWindow()
+	//rl.SetTargetFPS(60)
+	//
+	//logger.Info("Starting render")
+	//target := NewRenderTarget(width, height, renderCore.StartRender())
+	//
+	//for !rl.WindowShouldClose() {
+	//	rl.BeginDrawing()
+	//
+	//	rl.ClearBackground(rl.Blue)
+	//
+	//	for x := uint64(0); x < width; x++ {
+	//		for y := uint64(0); y < height; y++ {
+	//			rl.DrawPixelV(target.Pixel(x, y))
+	//		}
+	//	}
+	//
+	//	rl.EndDrawing()
+	//}
 }
 
 type renderTarget struct {
 	sync.RWMutex
 	image  []rl.Color
 	height uint64
+}
+
+func defaultScene() messages.Scene {
+	objects := []messages.Object{
+		{
+			Material: messages.MaterialFrom(
+				messages.Lambert{Albedo: messages.Color{
+					R: 204,
+					G: 204,
+					B: 0,
+				}},
+			),
+			Shape: messages.ShapeFrom(
+				messages.Sphere{
+					Origin: messages.Position{
+						X: 0,
+						Y: -100.5,
+						Z: -1,
+					},
+					Radius: 100,
+				},
+			),
+		},
+		{
+			Material: messages.MaterialFrom(
+				messages.Lambert{
+					Albedo: messages.Color{
+						R: 178,
+						G: 76,
+						B: 76,
+					},
+				},
+			),
+			Shape: messages.ShapeFrom(
+				messages.Sphere{
+					Origin: messages.Position{
+						X: 0,
+						Y: 0,
+						Z: -1,
+					},
+					Radius: 0.5,
+				},
+			),
+		},
+		{
+			Material: messages.MaterialFrom(
+				messages.Metal{
+					Albedo: messages.Color{
+						R: 204,
+						G: 204,
+						B: 204,
+					},
+					Scatter: 1.0,
+				},
+			),
+			Shape: messages.ShapeFrom(
+				messages.Sphere{
+					Origin: messages.Position{
+						X: -1,
+						Y: 0,
+						Z: -1,
+					},
+					Radius: 0.5,
+				},
+			),
+		},
+		{
+			Material: messages.MaterialFrom(
+				messages.Metal{
+					Albedo: messages.Color{
+						R: 204,
+						G: 153,
+						B: 51,
+					},
+					Scatter: 1.0,
+				},
+			),
+			Shape: messages.ShapeFrom(
+				messages.Sphere{
+					Origin: messages.Position{
+						X: 1,
+						Y: 0,
+						Z: -1,
+					},
+					Radius: 0.5,
+				},
+			),
+		},
+	}
+
+	return messages.Scene{
+		Objects: objects,
+		Camera: messages.Camera{Origin: messages.Position{
+			X: 0,
+			Y: 0,
+			Z: 0,
+		}},
+	}
 }
 
 func NewRenderTarget(width uint64, height uint64, pixels <-chan messages.Pixel) *renderTarget {

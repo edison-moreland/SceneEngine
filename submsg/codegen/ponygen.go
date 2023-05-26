@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"embed"
+	"fmt"
 	"os"
 	"strings"
 	"text/template"
@@ -101,6 +102,10 @@ func newPonyGen() codegen {
 				case "Byte":
 					return "U8"
 				default:
+					if realType, ok := strings.CutPrefix(submsgType, "[]"); ok {
+						return fmt.Sprintf("Array[%s]", snakeToGoId(true, realType))
+					}
+
 					return snakeToGoId(true, submsgType)
 				}
 			},
@@ -151,8 +156,15 @@ func newPonyGen() codegen {
 				case "Float":
 					return "0.0"
 				default:
+					if realType, ok := strings.CutPrefix(t, "[]"); ok {
+						return fmt.Sprintf("Array[%s]", snakeToGoId(true, realType))
+					}
+
 					return snakeToGoId(true, t) + ".zero()"
 				}
+			},
+			"arrayType": func(t string) string {
+				return snakeToGoId(true, strings.TrimPrefix(t, "[]"))
 			},
 			"isPrimitive": func(t string) bool {
 				switch t {
@@ -161,6 +173,9 @@ func newPonyGen() codegen {
 				default:
 					return false
 				}
+			},
+			"isArray": func(t string) bool {
+				return strings.HasPrefix(t, "[]")
 			},
 		}).ParseFS(ponyTemplates, "pony_templates/*.tmpl"))
 

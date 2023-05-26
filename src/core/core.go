@@ -130,3 +130,14 @@ func (r *RenderCore) StartRender() <-chan messages.Pixel {
 
 	return r.pixelsOut
 }
+
+func (r *RenderCore) SceneTest(scene messages.Scene) {
+	body, err := msgpack.Marshal(&scene)
+	if err != nil {
+		panic(err)
+	}
+
+	r.client.SceneTest(body)
+
+	r.WaitForReady()
+}
