@@ -1,7 +1,8 @@
 use fj = "fork_join"
 use "runtime_info"
 
-use "../messages"
+use messages = "../messages"
+use "../scene"
 
 // Renderer is the interface between tracer and the outside world
 // It orchestrates the render job for one image, calling tracer for every pixel, tracking progress, etc
@@ -16,22 +17,24 @@ type JobInput is PixelLoc
 type JobOutput is (PixelLoc, PixelColor)
 
 primitive Renderer
-    fun render(auth: SchedulerInfoAuth val, config: Config, on_pixel: OnPixelComplete, on_complete: OnRenderComplete) =>
+    fun render(auth: SchedulerInfoAuth val, config: messages.Config, scene: Scene, on_pixel: OnPixelComplete, on_complete: OnRenderComplete) =>
         fj.Job[JobInput, JobOutput](
-            WorkerBuilder(config),
+            WorkerBuilder(config, scene),
             PixelGenerator(config.image_width, config.image_height),
             RenderTarget(config.image_height, on_pixel, on_complete),
             auth
         ).start()
 
 class WorkerBuilder is fj.WorkerBuilder[JobInput, JobOutput]
-    let _config: Config
+    let _config: messages.Config
+    let _scene: Scene
 
-    new iso create(config: Config) =>
+    new iso create(config: messages.Config, scene: Scene) =>
         _config = config
+        _scene = scene
 
     fun ref apply(): fj.Worker[JobInput, JobOutput] iso^ =>
-        RenderWorker(_config)
+        RenderWorker(_config, _scene)
 
 class PixelGenerator is fj.Generator[JobInput]
     let _width: U64
@@ -88,8 +91,8 @@ class RenderWorker is fj.Worker[JobInput, JobOutput]
     var _tracer: Tracer
     var _pixel: PixelLoc = (0, 0)
 
-    new iso create(config: Config) =>
-        _tracer = Tracer(config)
+    new iso create(config: messages.Config, scene: Scene) =>
+        _tracer = Tracer(config, scene)
 
     fun ref receive(pixel: JobInput) =>
         _pixel = pixel

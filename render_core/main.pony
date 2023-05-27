@@ -7,6 +7,7 @@ use "runtime_info"
 use "logger"
 use "renderer"
 use "messages"
+use scene = "scene"
 use "../submsg/runtime/pony"
 
 actor Main is CoreServer
@@ -51,11 +52,17 @@ actor Main is CoreServer
         client.core_ready(None)
 
     be render_frame(body: Array[U8] iso) =>
+        let r: Reader = Reader
+        r.append(consume body)
+
+        let frame_scene = scene.Transform(UnmarshalMsgPackScene(consume r))
+
         let pixel = PixelBatcher(client, 100) // TODO: Best pixel batch size?
 
         Renderer.render(
             SchedulerInfoAuth(env.root),
             render_config,
+            frame_scene,
             pixel~apply(),
             {()(client) =>
                 pixel.send_batch()

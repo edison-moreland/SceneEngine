@@ -1,13 +1,16 @@
 use "random"
 
-use "../messages"
+use messages = "../messages"
+use "../scene"
 
 class Tracer
     let _rand: Rand = Rand.create()
-    let _config: Config
+    let _config: messages.Config
+    let _scene: Scene
 
-    new create(config: Config) =>
+    new create(config: messages.Config, scene: Scene) =>
         _config = config
+        _scene = scene
 
     fun clamp(x: F64, min: F64, max: F64): F64 =>
         x.max(min).min(max)

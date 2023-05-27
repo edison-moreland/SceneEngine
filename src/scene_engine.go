@@ -63,7 +63,7 @@ func main() {
 	rl.SetTargetFPS(60)
 
 	logger.Info("Starting render")
-	target := NewRenderTarget(width, height, renderCore.StartRender())
+	target := NewRenderTarget(width, height, renderCore.StartRender(defaultScene()))
 
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
