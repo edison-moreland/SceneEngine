@@ -666,26 +666,32 @@ primitive UnmarshalMsgPackObject
         shape'
         )
 class val Camera is MsgPackMarshalable
+    var aperture: F64
     var fov: F64
     var look_at: Position
     var look_from: Position
 
     new val create(
+        aperture': F64,
         fov': F64,
         look_at': Position,
         look_from': Position
         ) =>
+        aperture = aperture'
         fov = fov'
         look_at = look_at'
         look_from = look_from'
 
     new val zero() =>
+        aperture = 0.0
         fov = 0.0
         look_at = Position.zero()
         look_from = Position.zero()
 
     fun marshal_msgpack(w: Writer ref)? =>
-        MessagePackEncoder.fixmap(w, 3)?
+        MessagePackEncoder.fixmap(w, 4)?
+        MessagePackEncoder.fixstr(w, "Aperture")?
+        MessagePackEncoder.float_64(w, aperture)
         MessagePackEncoder.fixstr(w, "Fov")?
         MessagePackEncoder.float_64(w, fov)
         MessagePackEncoder.fixstr(w, "LookAt")?
@@ -695,6 +701,7 @@ class val Camera is MsgPackMarshalable
 
 primitive UnmarshalMsgPackCamera
     fun apply(r: Reader ref): Camera =>
+        var aperture': F64 = 0.0
         var fov': F64 = 0.0
         var look_at': Position = Position.zero()
         var look_from': Position = Position.zero()
@@ -703,6 +710,8 @@ primitive UnmarshalMsgPackCamera
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
                 match MessagePackDecoder.fixstr(r)?
+                | "Aperture" =>
+                    aperture' = MessagePackDecoder.f64(r)?
                 | "Fov" =>
                     fov' = MessagePackDecoder.f64(r)?
                 | "LookAt" =>
@@ -718,6 +727,7 @@ primitive UnmarshalMsgPackCamera
         end
 
         Camera(
+        aperture',
         fov',
         look_at',
         look_from'

@@ -8,11 +8,14 @@ primitive Degrees
         (d * F64.pi()) / 180
 
 primitive RandomVec3
+    fun _rand_range(rand: Rand, min: F64, max: F64): F64 =>
+        min + (rand.real() * (max - min))
+
     fun range(rand: Rand, min: F64, max: F64): Vec3 =>
         Vec3(
-            min + (rand.real() * (max - min)),
-            min + (rand.real() * (max - min)),
-            min + (rand.real() * (max - min))
+            _rand_range(rand, min, max),
+            _rand_range(rand, min, max),
+            _rand_range(rand, min, max)
         )
     
     fun unit_circle(rand: Rand): Vec3 =>
@@ -22,6 +25,20 @@ primitive RandomVec3
                 continue
             end
             return p
+        end
+        Vec3.zero()
+
+    fun unit_disk(rand: Rand): Vec3 =>
+        while true do
+            let p = Vec3(where
+                x' = _rand_range(rand, -1, 1),
+                y' = _rand_range(rand, -1, 1),
+                z' = 0
+            )
+
+            if p.length_squared() < 1 then
+                return p
+            end
         end
         Vec3.zero()
 

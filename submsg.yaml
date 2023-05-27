@@ -81,6 +81,7 @@ types:
       look_at: position
       look_from: position
       fov: Float
+      aperture: Float
 
   - name: scene
     type: struct

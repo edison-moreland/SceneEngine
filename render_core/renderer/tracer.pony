@@ -28,9 +28,16 @@ class Tracer
         let t: F64 = 0.5 * (r.direction.unit().y + 1.0)
         (Vec3(1.0, 1.0, 1.0) * (1.0 - t)) + (Vec3(0.5, 0.7, 1.0) * t )
 
-    fun camera_ray(s: F64, t: F64): Ray =>
+    fun ref camera_ray(s: F64, t: F64): Ray =>
         let c = _scene.camera
-        Ray(c.origin, (c.lower_left_corner + (c.horizontal*s) + (c.vertical*t)) - c.origin)
+
+        let rd = RandomVec3.unit_disk(_rand) * c.lens_radius
+        let offset = (c.u * rd.x) + (c.v * rd.y)
+
+        Ray(
+            (c.origin + offset),
+            (c.lower_left_corner + (c.horizontal*s) + (c.vertical*t)) - c.origin - offset
+        )
 
     fun ref apply(loc: PixelLoc): PixelColor =>
         let x = loc._1
