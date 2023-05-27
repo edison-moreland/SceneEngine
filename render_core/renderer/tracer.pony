@@ -73,27 +73,38 @@ class Tracer
         end
 
         match hit_scene(r)
-        | let rec: HitRecord =>
+        | (let rec: HitRecord, let mat: Material) =>
             // Bounce ray again
-            let next_target: Point3 = rec.p + RandomVec3.in_hemisphere(_rand, rec.normal)
-            trace(Ray(rec.p, next_target - rec.p), depth-1) * 0.5
+            match ScatterMaterial(_rand, r, rec)(mat)
+            | (let attenuation: Vec3, let scattered: Ray) =>
+                attenuation * trace(scattered, depth-1)
+            | None =>
+                Vec3.zero()
+            end
         | None => sky_color(r)
         end
 
-    fun hit_scene(r: Ray): (HitRecord | None) =>
+    fun hit_scene(r: Ray): ((HitRecord, Material) | None) =>
         var hit_record: (HitRecord | None) = None
         var closest_t = F64.max_value()
+        var material: Material = Lambert(Vec3.zero())
 
         for o in _scene.objects.values() do
             match HitShape(r, 0.0001, closest_t)(o.shape)
             | let rec: HitRecord =>
                 hit_record = rec
                 closest_t = rec.t
+                material = o.material
             | None => continue
             end
         end
 
-        hit_record
+        match hit_record
+        | let rec: HitRecord =>
+            (rec, material)
+        | None =>
+            None
+        end
 
 class val HitRecord
     let normal: Vec3
@@ -163,3 +174,68 @@ class HitShape is ShapeVisitor[(HitRecord | None)]
 
         let p = r.at(root)
         HitRecord.from_ray(r, (p - s.origin) / s.radius, root, p)
+
+class val ScatterMaterial is MaterialVisitor[((Vec3, Ray) | None)] // (color, attenuation)
+    let _rand: Rand ref
+
+    let ray_in: Ray
+    let rec: HitRecord
+
+    new create(rand: Rand, ray_in': Ray, rec': HitRecord) =>
+        _rand = rand
+        ray_in = ray_in'
+        rec = rec'
+
+    fun ref apply(m: Material): ((Vec3, Ray) | None) =>
+        m.accept[((Vec3, Ray) | None)](this)
+
+    fun ref visit_lambert(l: Lambert box): ((Vec3, Ray) | None) =>
+        var scatter_direction = rec.normal + RandomVec3.unit_circle(_rand)
+
+        if scatter_direction.near_zero() then
+            scatter_direction = rec.normal
+        end
+
+        (
+            l.albedo,
+            Ray(rec.p, scatter_direction)
+        )
+
+    fun ref visit_metal(m: Metal box): ((Vec3, Ray) | None) =>
+        let reflected = ray_in.direction.unit().reflect(rec.normal)
+
+        (
+            m.albedo,
+            Ray(rec.p, reflected)
+        )
+
+    fun reflectance(cosine: F64, ri: F64): F64 =>
+        // Shlick!
+        let r0 = ((1 - ri) / (1 + ri)).pow(2)
+        r0 + ((1-r0) * (1 - cosine).pow(5))
+
+    fun ref visit_dielectric(d: Dielectric box): ((Vec3, Ray) | None) =>
+        let refraction_ratio = if rec.front_face then
+            (1/d.index_of_refraction)
+        else
+            d.index_of_refraction
+        end
+
+        let unit_direction = ray_in.direction.unit()
+
+        let cos_theta = (-unit_direction).dot(rec.normal).min(1.0)
+        let sin_theta = (1.0 - cos_theta.pow(2)).sqrt()
+
+        let cannot_refract = (refraction_ratio * sin_theta) > 1.0
+        let should_reflect = reflectance(cos_theta, refraction_ratio) > _rand.real()
+
+        let direction = if (cannot_refract or should_reflect) then
+            unit_direction.reflect(rec.normal)
+        else
+            unit_direction.refract(rec.normal, refraction_ratio)
+        end
+
+        (
+            Vec3.one(),
+            Ray(rec.p, direction)
+        )

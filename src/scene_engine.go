@@ -45,13 +45,13 @@ func main() {
 	logger.Info("Render core ready!", zap.String("version", renderCore.Info()))
 
 	aspectRatio := float64(16.0 / 9.0)
-	width := uint64(400)
+	width := uint64(600)
 	height := uint64(float64(width) / aspectRatio)
 	renderCore.SetConfig(messages.Config{
 		AspectRatio: aspectRatio,
 		ImageWidth:  width,
 		ImageHeight: height,
-		Samples:     50,
+		Samples:     100,
 		Depth:       50,
 	})
 	renderCore.WaitForReady()
@@ -152,13 +152,8 @@ func defaultScene() messages.Scene {
 		},
 		{
 			Material: messages.MaterialFrom(
-				messages.Metal{
-					Albedo: messages.Color{
-						R: 204,
-						G: 153,
-						B: 51,
-					},
-					Scatter: 1.0,
+				messages.Dielectric{
+					IndexOfRefraction: 1.5,
 				},
 			),
 			Shape: messages.ShapeFrom(
