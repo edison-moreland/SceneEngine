@@ -1,10 +1,10 @@
 use "../math"
 
-interface ShapeVisitor
-    fun visit_sphere(s: Sphere box)
+interface ShapeVisitor[T: Any]
+    fun visit_sphere(s: Sphere box): T
 
 interface val Shape
-    fun accept(s: ShapeVisitor)
+    fun accept[T: Any](s: ShapeVisitor[T] box): T
 
 class val Sphere is Shape
     let origin: Vec3
@@ -14,5 +14,5 @@ class val Sphere is Shape
         origin = origin'
         radius = radius'
 
-    fun accept(s: ShapeVisitor) =>
+    fun accept[T: Any](s: ShapeVisitor[T] box): T =>
         s.visit_sphere(this)
