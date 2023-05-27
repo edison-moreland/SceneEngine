@@ -222,7 +222,9 @@ type Object struct {
 	Shape    Shape
 }
 type Camera struct {
-	Origin Position
+	Fov      float64
+	LookAt   Position
+	LookFrom Position
 }
 type Scene struct {
 	Camera  Camera

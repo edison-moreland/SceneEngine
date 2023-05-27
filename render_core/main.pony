@@ -55,7 +55,7 @@ actor Main is CoreServer
         let r: Reader = Reader
         r.append(consume body)
 
-        let frame_scene = scene.Transform(UnmarshalMsgPackScene(consume r))
+        let frame_scene = scene.Transform(UnmarshalMsgPackScene(consume r), render_config)
 
         let pixel = PixelBatcher(client, 100) // TODO: Best pixel batch size?
 

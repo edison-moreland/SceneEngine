@@ -666,31 +666,49 @@ primitive UnmarshalMsgPackObject
         shape'
         )
 class val Camera is MsgPackMarshalable
-    var origin: Position
+    var fov: F64
+    var look_at: Position
+    var look_from: Position
 
     new val create(
-        origin': Position
+        fov': F64,
+        look_at': Position,
+        look_from': Position
         ) =>
-        origin = origin'
+        fov = fov'
+        look_at = look_at'
+        look_from = look_from'
 
     new val zero() =>
-        origin = Position.zero()
+        fov = 0.0
+        look_at = Position.zero()
+        look_from = Position.zero()
 
     fun marshal_msgpack(w: Writer ref)? =>
-        MessagePackEncoder.fixmap(w, 1)?
-        MessagePackEncoder.fixstr(w, "Origin")?
-        origin.marshal_msgpack(w)?
+        MessagePackEncoder.fixmap(w, 3)?
+        MessagePackEncoder.fixstr(w, "Fov")?
+        MessagePackEncoder.float_64(w, fov)
+        MessagePackEncoder.fixstr(w, "LookAt")?
+        look_at.marshal_msgpack(w)?
+        MessagePackEncoder.fixstr(w, "LookFrom")?
+        look_from.marshal_msgpack(w)?
 
 primitive UnmarshalMsgPackCamera
     fun apply(r: Reader ref): Camera =>
-        var origin': Position = Position.zero()
+        var fov': F64 = 0.0
+        var look_at': Position = Position.zero()
+        var look_from': Position = Position.zero()
 
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
                 match MessagePackDecoder.fixstr(r)?
-                | "Origin" =>
-                    origin' = UnmarshalMsgPackPosition(r)
+                | "Fov" =>
+                    fov' = MessagePackDecoder.f64(r)?
+                | "LookAt" =>
+                    look_at' = UnmarshalMsgPackPosition(r)
+                | "LookFrom" =>
+                    look_from' = UnmarshalMsgPackPosition(r)
                 else
                     Debug("unknown field" where stream = DebugErr)
                 end
@@ -700,7 +718,9 @@ primitive UnmarshalMsgPackCamera
         end
 
         Camera(
-        origin'
+        fov',
+        look_at',
+        look_from'
         )
 class val Scene is MsgPackMarshalable
     var camera: Camera

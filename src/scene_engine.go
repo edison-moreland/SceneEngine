@@ -45,13 +45,13 @@ func main() {
 	logger.Info("Render core ready!", zap.String("version", renderCore.Info()))
 
 	aspectRatio := float64(16.0 / 9.0)
-	width := uint64(600)
+	width := uint64(400)
 	height := uint64(float64(width) / aspectRatio)
 	renderCore.SetConfig(messages.Config{
 		AspectRatio: aspectRatio,
 		ImageWidth:  width,
 		ImageHeight: height,
-		Samples:     100,
+		Samples:     50,
 		Depth:       50,
 	})
 	renderCore.WaitForReady()
@@ -111,9 +111,9 @@ func defaultScene() messages.Scene {
 			Material: messages.MaterialFrom(
 				messages.Lambert{
 					Albedo: messages.Color{
-						R: 178,
-						G: 76,
-						B: 76,
+						R: 25,
+						G: 51,
+						B: 127,
 					},
 				},
 			),
@@ -130,13 +130,8 @@ func defaultScene() messages.Scene {
 		},
 		{
 			Material: messages.MaterialFrom(
-				messages.Metal{
-					Albedo: messages.Color{
-						R: 204,
-						G: 204,
-						B: 204,
-					},
-					Scatter: 1.0,
+				messages.Dielectric{
+					IndexOfRefraction: 1.5,
 				},
 			),
 			Shape: messages.ShapeFrom(
@@ -159,6 +154,28 @@ func defaultScene() messages.Scene {
 			Shape: messages.ShapeFrom(
 				messages.Sphere{
 					Origin: messages.Position{
+						X: -1,
+						Y: 0,
+						Z: -1,
+					},
+					Radius: -0.45,
+				},
+			),
+		},
+		{
+			Material: messages.MaterialFrom(
+				messages.Metal{
+					Albedo: messages.Color{
+						R: 204,
+						G: 153,
+						B: 51,
+					},
+					Scatter: 0,
+				},
+			),
+			Shape: messages.ShapeFrom(
+				messages.Sphere{
+					Origin: messages.Position{
 						X: 1,
 						Y: 0,
 						Z: -1,
@@ -171,11 +188,19 @@ func defaultScene() messages.Scene {
 
 	return messages.Scene{
 		Objects: objects,
-		Camera: messages.Camera{Origin: messages.Position{
-			X: 0,
-			Y: 0,
-			Z: 0,
-		}},
+		Camera: messages.Camera{
+			LookFrom: messages.Position{
+				X: -2,
+				Y: 2,
+				Z: 1,
+			},
+			LookAt: messages.Position{
+				X: 0,
+				Y: 0,
+				Z: -1,
+			},
+			Fov: 20,
+		},
 	}
 }
 

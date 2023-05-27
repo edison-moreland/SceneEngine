@@ -3,6 +3,10 @@ use "format"
 
 use messages = "../messages"
 
+primitive Degrees
+    fun to_radians(d: F64): F64 =>
+        (d * F64.pi()) / 180
+
 primitive RandomVec3
     fun range(rand: Rand, min: F64, max: F64): Vec3 =>
         Vec3(

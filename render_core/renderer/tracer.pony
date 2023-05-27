@@ -5,36 +5,14 @@ use messages = "../messages"
 use "../scene"
 use "../math"
 
-class val _Camera
-    let origin: Point3
-    let lower_left_corner: Point3
-    let horizontal: Vec3
-    let vertical: Vec3
-
-    new val create(aspect_ratio: F64) =>
-        // let aspect_ratio = 16.0 / 9.0
-        let viewport_height: F64 = 2.0
-        let viewport_width: F64 = aspect_ratio * viewport_height
-        let focal_length: F64 = 1.0
-
-        origin = Vec3.zero()
-        horizontal = Vec3(viewport_width, 0.0, 0.0)
-        vertical = Vec3(0.0, viewport_height, 0.0)
-        lower_left_corner = origin - (horizontal/2) - (vertical/2) - Vec3(0, 0, focal_length)
-
-    fun ray(u: F64, v: F64): Ray =>
-        Ray(origin, (lower_left_corner + (horizontal * u) + (vertical * v)) - origin)
-
 class Tracer
     let _rand: Rand = Rand.create()
     let _config: messages.Config
     let _scene: Scene
-    let _camera: _Camera
 
     new create(config: messages.Config, scene: Scene) =>
         _config = config
         _scene = scene
-        _camera = _Camera(_config.aspect_ratio)
 
     fun clamp(x: F64, min: F64, max: F64): F64 =>
         x.max(min).min(max)
@@ -50,16 +28,20 @@ class Tracer
         let t: F64 = 0.5 * (r.direction.unit().y + 1.0)
         (Vec3(1.0, 1.0, 1.0) * (1.0 - t)) + (Vec3(0.5, 0.7, 1.0) * t )
 
+    fun camera_ray(s: F64, t: F64): Ray =>
+        let c = _scene.camera
+        Ray(c.origin, (c.lower_left_corner + (c.horizontal*s) + (c.vertical*t)) - c.origin)
+
     fun ref apply(loc: PixelLoc): PixelColor =>
         let x = loc._1
         let y = loc._2
 
         var color = Vec3.zero()
-        for s in Range[U64](0, _config.samples) do
+        for i in Range[U64](0, _config.samples) do
             let u: F64 = (x.f64() + _rand.real()) / (_config.image_width - 1).f64()
             let v: F64 = (y.f64() + _rand.real()) / (_config.image_height - 1).f64()
 
-            let ray = _camera.ray(u, v)
+            let ray = camera_ray(u, v)
 
             color = color + trace(ray, _config.depth)
 

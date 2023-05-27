@@ -78,7 +78,9 @@ types:
   - name: camera
     type: struct
     fields:
-      origin: position
+      look_at: position
+      look_from: position
+      fov: Float
 
   - name: scene
     type: struct
