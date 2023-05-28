@@ -1,22 +1,44 @@
 use "random"
 use "format"
 
+use messages = "../messages"
+
+primitive Degrees
+    fun to_radians(d: F64): F64 =>
+        (d * F64.pi()) / 180
+
 primitive RandomVec3
+    fun _rand_range(rand: Rand, min: F64, max: F64): F64 =>
+        min + (rand.real() * (max - min))
+
     fun range(rand: Rand, min: F64, max: F64): Vec3 =>
         Vec3(
-            min + (rand.real() * (max - min)),
-            min + (rand.real() * (max - min)),
-            min + (rand.real() * (max - min))
+            _rand_range(rand, min, max),
+            _rand_range(rand, min, max),
+            _rand_range(rand, min, max)
         )
     
     fun unit_circle(rand: Rand): Vec3 =>
-        // TODO: Redo this
         while true do
             let p = range(rand, -1, 1)
             if (p.length_squared() >= 1) then
                 continue
             end
             return p
+        end
+        Vec3.zero()
+
+    fun unit_disk(rand: Rand): Vec3 =>
+        while true do
+            let p = Vec3(where
+                x' = _rand_range(rand, -1, 1),
+                y' = _rand_range(rand, -1, 1),
+                z' = 0
+            )
+
+            if p.length_squared() < 1 then
+                return p
+            end
         end
         Vec3.zero()
 
@@ -83,6 +105,20 @@ class val Vec3
 
     fun length(): F64 => 
         length_squared().sqrt()
+
+    fun near_zero(): Bool =>
+        let s: F64 = 1e-8
+        (x.abs() < s) and (y.abs() < s) and (z.abs() < s)
+
+    fun reflect(n: Vec3): Vec3 =>
+        this - (n * this.dot(n) * 2)
+
+    fun refract(n: Vec3, etai_over_etat: F64): Vec3 =>
+        let cos_theta: F64 = (-this).dot(n).min(1.0)
+        let r_out_perp: Vec3 = (this + (n*cos_theta)) * etai_over_etat
+        let r_out_parallel: Vec3 = n * -(1.0 - r_out_perp.length_squared()).abs().sqrt()
+
+        r_out_perp + r_out_parallel
 
 type Point3 is Vec3
 

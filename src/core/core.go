@@ -121,23 +121,17 @@ func (r *RenderCore) SetConfig(c messages.Config) {
 }
 
 // StartRender will start rendering the next frame
-func (r *RenderCore) StartRender() <-chan messages.Pixel {
+func (r *RenderCore) StartRender(scene messages.Scene) <-chan messages.Pixel {
 	if r.pixelsOut == nil {
 		r.pixelsOut = make(chan messages.Pixel)
 	}
 
-	r.client.RenderFrame(nil)
-
-	return r.pixelsOut
-}
-
-func (r *RenderCore) SceneTest(scene messages.Scene) {
-	body, err := msgpack.Marshal(&scene)
+	body, err := msgpack.Marshal(scene)
 	if err != nil {
 		panic(err)
 	}
 
-	r.client.SceneTest(body)
+	r.client.RenderFrame(body)
 
-	r.WaitForReady()
+	return r.pixelsOut
 }

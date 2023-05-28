@@ -45,13 +45,11 @@ primitive Core
     fun info(): MsgId => 0
     fun config(): MsgId => 1
     fun render_frame(): MsgId => 2
-    fun scene_test(): MsgId => 3
 
 interface tag CoreServer
     fun tag info(body: Array[U8] iso)
     fun tag config(body: Array[U8] iso)
     fun tag render_frame(body: Array[U8] iso)
-    fun tag scene_test(body: Array[U8] iso)
 
 primitive CoreRouter
     fun apply(s: CoreServer): ReceiveMsg =>
@@ -60,7 +58,6 @@ primitive CoreRouter
             | Core.info() => s.info(consume body)
             | Core.config() => s.config(consume body)
             | Core.render_frame() => s.render_frame(consume body)
-            | Core.scene_test() => s.scene_test(consume body)
             end
         }
 
@@ -78,9 +75,6 @@ actor CoreClient
 
     be render_frame(data: (Array[U8 val] iso | None)) =>
         send_msg(Core.render_frame(), consume data)
-
-    be scene_test(data: (Array[U8 val] iso | None)) =>
-        send_msg(Core.scene_test(), consume data)
 
 
 class val MsgCoreInfo is MsgPackMarshalable
@@ -106,11 +100,16 @@ primitive UnmarshalMsgPackMsgCoreInfo
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
                 | "Version" =>
                     version' = MessagePackDecoder.str(r)?
                 else
-                    Debug("unknown field" where stream = DebugErr)
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
                 end
             end
         else
@@ -171,7 +170,8 @@ primitive UnmarshalMsgPackConfig
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
                 | "AspectRatio" =>
                     aspect_ratio' = MessagePackDecoder.f64(r)?
                 | "Depth" =>
@@ -183,7 +183,11 @@ primitive UnmarshalMsgPackConfig
                 | "Samples" =>
                     samples' = MessagePackDecoder.u64(r)?
                 else
-                    Debug("unknown field" where stream = DebugErr)
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
                 end
             end
         else
@@ -234,7 +238,8 @@ primitive UnmarshalMsgPackPosition
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
                 | "X" =>
                     x' = MessagePackDecoder.f64(r)?
                 | "Y" =>
@@ -242,7 +247,11 @@ primitive UnmarshalMsgPackPosition
                 | "Z" =>
                     z' = MessagePackDecoder.f64(r)?
                 else
-                    Debug("unknown field" where stream = DebugErr)
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
                 end
             end
         else
@@ -291,7 +300,8 @@ primitive UnmarshalMsgPackColor
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
                 | "B" =>
                     b' = MessagePackDecoder.u8(r)?
                 | "G" =>
@@ -299,7 +309,11 @@ primitive UnmarshalMsgPackColor
                 | "R" =>
                     r' = MessagePackDecoder.u8(r)?
                 else
-                    Debug("unknown field" where stream = DebugErr)
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
                 end
             end
         else
@@ -348,7 +362,8 @@ primitive UnmarshalMsgPackPixel
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
                 | "Color" =>
                     color' = UnmarshalMsgPackColor(r)
                 | "X" =>
@@ -356,7 +371,11 @@ primitive UnmarshalMsgPackPixel
                 | "Y" =>
                     y' = MessagePackDecoder.u64(r)?
                 else
-                    Debug("unknown field" where stream = DebugErr)
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
                 end
             end
         else
@@ -391,11 +410,16 @@ primitive UnmarshalMsgPackLambert
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
                 | "Albedo" =>
                     albedo' = UnmarshalMsgPackColor(r)
                 else
-                    Debug("unknown field" where stream = DebugErr)
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
                 end
             end
         else
@@ -435,13 +459,18 @@ primitive UnmarshalMsgPackMetal
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
                 | "Albedo" =>
                     albedo' = UnmarshalMsgPackColor(r)
                 | "Scatter" =>
                     scatter' = MessagePackDecoder.f64(r)?
                 else
-                    Debug("unknown field" where stream = DebugErr)
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
                 end
             end
         else
@@ -475,11 +504,16 @@ primitive UnmarshalMsgPackDielectric
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
                 | "IndexOfRefraction" =>
                     index_of_refraction' = MessagePackDecoder.f64(r)?
                 else
-                    Debug("unknown field" where stream = DebugErr)
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
                 end
             end
         else
@@ -569,13 +603,18 @@ primitive UnmarshalMsgPackSphere
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
                 | "Origin" =>
                     origin' = UnmarshalMsgPackPosition(r)
                 | "Radius" =>
                     radius' = MessagePackDecoder.f64(r)?
                 else
-                    Debug("unknown field" where stream = DebugErr)
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
                 end
             end
         else
@@ -654,13 +693,18 @@ primitive UnmarshalMsgPackObject
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
                 | "Material" =>
                     material' = UnmarshalMsgPackMaterial(r)
                 | "Shape" =>
                     shape' = UnmarshalMsgPackShape(r)
                 else
-                    Debug("unknown field" where stream = DebugErr)
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
                 end
             end
         else
@@ -672,33 +716,65 @@ primitive UnmarshalMsgPackObject
         shape'
         )
 class val Camera is MsgPackMarshalable
-    var origin: Position
+    var aperture: F64
+    var fov: F64
+    var look_at: Position
+    var look_from: Position
 
     new val create(
-        origin': Position
+        aperture': F64,
+        fov': F64,
+        look_at': Position,
+        look_from': Position
         ) =>
-        origin = origin'
+        aperture = aperture'
+        fov = fov'
+        look_at = look_at'
+        look_from = look_from'
 
     new val zero() =>
-        origin = Position.zero()
+        aperture = 0.0
+        fov = 0.0
+        look_at = Position.zero()
+        look_from = Position.zero()
 
     fun marshal_msgpack(w: Writer ref)? =>
-        MessagePackEncoder.fixmap(w, 1)?
-        MessagePackEncoder.fixstr(w, "Origin")?
-        origin.marshal_msgpack(w)?
+        MessagePackEncoder.fixmap(w, 4)?
+        MessagePackEncoder.fixstr(w, "Aperture")?
+        MessagePackEncoder.float_64(w, aperture)
+        MessagePackEncoder.fixstr(w, "Fov")?
+        MessagePackEncoder.float_64(w, fov)
+        MessagePackEncoder.fixstr(w, "LookAt")?
+        look_at.marshal_msgpack(w)?
+        MessagePackEncoder.fixstr(w, "LookFrom")?
+        look_from.marshal_msgpack(w)?
 
 primitive UnmarshalMsgPackCamera
     fun apply(r: Reader ref): Camera =>
-        var origin': Position = Position.zero()
+        var aperture': F64 = 0.0
+        var fov': F64 = 0.0
+        var look_at': Position = Position.zero()
+        var look_from': Position = Position.zero()
 
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
-                | "Origin" =>
-                    origin' = UnmarshalMsgPackPosition(r)
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
+                | "Aperture" =>
+                    aperture' = MessagePackDecoder.f64(r)?
+                | "Fov" =>
+                    fov' = MessagePackDecoder.f64(r)?
+                | "LookAt" =>
+                    look_at' = UnmarshalMsgPackPosition(r)
+                | "LookFrom" =>
+                    look_from' = UnmarshalMsgPackPosition(r)
                 else
-                    Debug("unknown field" where stream = DebugErr)
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
                 end
             end
         else
@@ -706,7 +782,10 @@ primitive UnmarshalMsgPackCamera
         end
 
         Camera(
-        origin'
+        aperture',
+        fov',
+        look_at',
+        look_from'
         )
 class val Scene is MsgPackMarshalable
     var camera: Camera
@@ -741,13 +820,18 @@ primitive UnmarshalMsgPackScene
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
                 | "Camera" =>
                     camera' = UnmarshalMsgPackCamera(r)
                 | "Objects" =>
                     objects' = Unmarshal.array[Object](r, UnmarshalMsgPackObject~apply())?
                 else
-                    Debug("unknown field" where stream = DebugErr)
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
                 end
             end
         else

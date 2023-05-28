@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"sync"
 
@@ -44,42 +45,40 @@ func main() {
 	renderCore.WaitForReady()
 	logger.Info("Render core ready!", zap.String("version", renderCore.Info()))
 
-	aspectRatio := float64(16.0 / 9.0)
-	width := uint64(400)
+	aspectRatio := float64(3.0 / 2.0)
+	width := uint64(1200)
 	height := uint64(float64(width) / aspectRatio)
 	renderCore.SetConfig(messages.Config{
 		AspectRatio: aspectRatio,
 		ImageWidth:  width,
 		ImageHeight: height,
-		Samples:     50,
+		Samples:     500,
 		Depth:       50,
 	})
 	renderCore.WaitForReady()
 	logger.Info("Set config")
 
-	renderCore.SceneTest(defaultScene())
+	rl.InitWindow(int32(width), int32(height), "SceneEngine")
 
-	//rl.InitWindow(int32(width), int32(height), "SceneEngine")
-	//
-	//defer rl.CloseWindow()
-	//rl.SetTargetFPS(60)
-	//
-	//logger.Info("Starting render")
-	//target := NewRenderTarget(width, height, renderCore.StartRender())
-	//
-	//for !rl.WindowShouldClose() {
-	//	rl.BeginDrawing()
-	//
-	//	rl.ClearBackground(rl.Blue)
-	//
-	//	for x := uint64(0); x < width; x++ {
-	//		for y := uint64(0); y < height; y++ {
-	//			rl.DrawPixelV(target.Pixel(x, y))
-	//		}
-	//	}
-	//
-	//	rl.EndDrawing()
-	//}
+	defer rl.CloseWindow()
+	rl.SetTargetFPS(60)
+
+	logger.Info("Starting render")
+	target := NewRenderTarget(width, height, renderCore.StartRender(defaultScene()))
+
+	for !rl.WindowShouldClose() {
+		rl.BeginDrawing()
+
+		rl.ClearBackground(rl.Blue)
+
+		for x := uint64(0); x < width; x++ {
+			for y := uint64(0); y < height; y++ {
+				rl.DrawPixelV(target.Pixel(x, y))
+			}
+		}
+
+		rl.EndDrawing()
+	}
 }
 
 type renderTarget struct {
@@ -93,19 +92,36 @@ func defaultScene() messages.Scene {
 		{
 			Material: messages.MaterialFrom(
 				messages.Lambert{Albedo: messages.Color{
-					R: 204,
-					G: 204,
-					B: 0,
+					R: 127,
+					G: 127,
+					B: 127,
 				}},
 			),
 			Shape: messages.ShapeFrom(
 				messages.Sphere{
 					Origin: messages.Position{
 						X: 0,
-						Y: -100.5,
-						Z: -1,
+						Y: -1000,
+						Z: 0,
 					},
-					Radius: 100,
+					Radius: 1000,
+				},
+			),
+		},
+		{
+			Material: messages.MaterialFrom(
+				messages.Dielectric{
+					IndexOfRefraction: 1.5,
+				},
+			),
+			Shape: messages.ShapeFrom(
+				messages.Sphere{
+					Origin: messages.Position{
+						X: 0,
+						Y: 1,
+						Z: 0,
+					},
+					Radius: 1,
 				},
 			),
 		},
@@ -113,76 +129,111 @@ func defaultScene() messages.Scene {
 			Material: messages.MaterialFrom(
 				messages.Lambert{
 					Albedo: messages.Color{
+						R: 102,
+						G: 51,
+						B: 25,
+					},
+				},
+			),
+			Shape: messages.ShapeFrom(
+				messages.Sphere{
+					Origin: messages.Position{
+						X: -4,
+						Y: 1,
+						Z: 0,
+					},
+					Radius: 1,
+				},
+			),
+		},
+		{
+			Material: messages.MaterialFrom(
+				messages.Metal{
+					Albedo: messages.Color{
 						R: 178,
-						G: 76,
-						B: 76,
-					},
-				},
-			),
-			Shape: messages.ShapeFrom(
-				messages.Sphere{
-					Origin: messages.Position{
-						X: 0,
-						Y: 0,
-						Z: -1,
-					},
-					Radius: 0.5,
-				},
-			),
-		},
-		{
-			Material: messages.MaterialFrom(
-				messages.Metal{
-					Albedo: messages.Color{
-						R: 204,
-						G: 204,
-						B: 204,
-					},
-					Scatter: 1.0,
-				},
-			),
-			Shape: messages.ShapeFrom(
-				messages.Sphere{
-					Origin: messages.Position{
-						X: -1,
-						Y: 0,
-						Z: -1,
-					},
-					Radius: 0.5,
-				},
-			),
-		},
-		{
-			Material: messages.MaterialFrom(
-				messages.Metal{
-					Albedo: messages.Color{
-						R: 204,
 						G: 153,
-						B: 51,
+						B: 127,
 					},
-					Scatter: 1.0,
 				},
 			),
 			Shape: messages.ShapeFrom(
 				messages.Sphere{
 					Origin: messages.Position{
-						X: 1,
-						Y: 0,
-						Z: -1,
+						X: 4,
+						Y: 1,
+						Z: 0,
 					},
-					Radius: 0.5,
+					Radius: 1,
 				},
 			),
 		},
 	}
 
+	for a := -11; a < 11; a += 10 {
+		for b := -11; b < 11; b += 10 {
+			center := rl.NewVector3(
+				float32(a)+(0.9*rand.Float32()),
+				0.2,
+				float32(b)+(0.9*rand.Float32()),
+			)
+
+			if rl.Vector3Length(rl.Vector3Subtract(center, rl.NewVector3(4, 0.2, 0))) > 0.9 {
+				materialChoice := rand.Float32()
+				var material messages.Material
+				if materialChoice < 0.8 {
+					material = messages.MaterialFrom(messages.Lambert{
+						Albedo: messages.Color{
+							R: uint8(rand.Int()),
+							G: uint8(rand.Int()),
+							B: uint8(rand.Int()),
+						},
+					})
+				} else if materialChoice < 0.95 {
+					material = messages.MaterialFrom(messages.Metal{
+						Albedo: messages.Color{
+							R: uint8(rand.Intn(125) + 125),
+							G: uint8(rand.Intn(125) + 125),
+							B: uint8(rand.Intn(125) + 125),
+						},
+						Scatter: rand.Float64() / 2,
+					})
+				} else {
+					material = messages.MaterialFrom(messages.Dielectric{
+						IndexOfRefraction: 1.5,
+					})
+				}
+
+				objects = append(objects, messages.Object{
+					Material: material,
+					Shape: messages.ShapeFrom(messages.Sphere{
+						Origin: messages.Position{
+							X: float64(center.X),
+							Y: float64(center.Y),
+							Z: float64(center.Z),
+						},
+						Radius: 0.2,
+					}),
+				})
+			}
+		}
+	}
+
 	return messages.Scene{
 		Objects: objects,
-		Camera: messages.Camera{Origin: messages.Position{
-			X: 0,
-			Y: 0,
-			Z: 0,
-		}},
+		Camera: messages.Camera{
+			LookFrom: messages.Position{
+				X: 13,
+				Y: 2,
+				Z: 3,
+			},
+			LookAt: messages.Position{
+				X: 0,
+				Y: 0,
+				Z: 0,
+			},
+			Fov:      20,
+			Aperture: 0.1,
+		},
 	}
 }
 

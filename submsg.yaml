@@ -78,7 +78,10 @@ types:
   - name: camera
     type: struct
     fields:
-      origin: position
+      look_at: position
+      look_from: position
+      fov: Float
+      aperture: Float
 
   - name: scene
     type: struct
@@ -108,6 +111,3 @@ messages:
 
     - name: render_frame
       desc: Start rendering the next frame
-
-    - name: scene_test
-      desc: Scene test
