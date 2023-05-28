@@ -1,0 +1,37 @@
+// math := import("math")
+
+config := {
+    aspect_ratio: (3.0 / 2.0),
+    image_width: 400,
+    samples: 500,
+    depth: 50
+}
+
+// scene := func(frame, seconds) {
+//     // Sphere rotates in circles
+//     Object(
+//         Vec3(math.sin(seconds), 0, math.cos(seconds)),
+//         Metal(Color(250, 150, 0), 1),
+//         Transform(
+//             Vec3(0.5, 0, 0),
+//             Sphere(1)
+//         ),
+//         Transform(
+//             Vec3(-0.5, 0, 0),
+//             Sphere(1)
+//         )
+//     )
+
+//     // Ground sphere
+//     Object(
+//         Vec3(0, -101, 0),
+//         Lambert(Color(150, 150, 150)),
+//         Sphere(100)
+//     )
+
+//     Camera(
+//         Vec(4, 4, 4), // origin
+//         Vec(0, 0, 0), // looking at
+//         90 //fov
+//     )
+// }

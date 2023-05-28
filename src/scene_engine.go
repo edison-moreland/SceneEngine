@@ -13,12 +13,17 @@ import (
 
 	"github.com/edison-moreland/SceneEngine/src/core"
 	"github.com/edison-moreland/SceneEngine/src/core/messages"
+	"github.com/edison-moreland/SceneEngine/src/script"
 )
 
-var corePath string
+var (
+	corePath   string
+	scriptPath string
+)
 
 func init() {
 	flag.StringVar(&corePath, "core", "", "Path to rendercore")
+	flag.StringVar(&scriptPath, "script", "./scene.se", "Path to scene script")
 	flag.Parse()
 
 	if corePath == "" {
@@ -33,6 +38,17 @@ func main() {
 
 	logger.Info("Welcome to SceneEngine!")
 
+	logger.Info("Loading scene script")
+	sceneScript, err := script.LoadSceneScript(scriptPath)
+	if err != nil {
+		logger.Fatal("Could not load script!", zap.Error(err))
+	}
+
+	renderConfig, err := sceneScript.Config()
+	if err != nil {
+		logger.Fatal("Could not get render config!", zap.Error(err))
+	}
+
 	logger.Info("Starting render core")
 	coreCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -45,34 +61,29 @@ func main() {
 	renderCore.WaitForReady()
 	logger.Info("Render core ready!", zap.String("version", renderCore.Info()))
 
-	aspectRatio := float64(3.0 / 2.0)
-	width := uint64(1200)
-	height := uint64(float64(width) / aspectRatio)
-	renderCore.SetConfig(messages.Config{
-		AspectRatio: aspectRatio,
-		ImageWidth:  width,
-		ImageHeight: height,
-		Samples:     500,
-		Depth:       50,
-	})
+	renderCore.SetConfig(renderConfig)
 	renderCore.WaitForReady()
 	logger.Info("Set config")
 
-	rl.InitWindow(int32(width), int32(height), "SceneEngine")
+	rl.InitWindow(int32(renderConfig.ImageWidth), int32(renderConfig.ImageHeight), "SceneEngine")
 
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
 
 	logger.Info("Starting render")
-	target := NewRenderTarget(width, height, renderCore.StartRender(defaultScene()))
+	target := NewRenderTarget(
+		renderConfig.ImageWidth,
+		renderConfig.ImageHeight,
+		renderCore.StartRender(defaultScene()),
+	)
 
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
 
 		rl.ClearBackground(rl.Blue)
 
-		for x := uint64(0); x < width; x++ {
-			for y := uint64(0); y < height; y++ {
+		for x := uint64(0); x < renderConfig.ImageWidth; x++ {
+			for y := uint64(0); y < renderConfig.ImageHeight; y++ {
 				rl.DrawPixelV(target.Pixel(x, y))
 			}
 		}
@@ -169,8 +180,9 @@ func defaultScene() messages.Scene {
 		},
 	}
 
-	for a := -11; a < 11; a += 10 {
-		for b := -11; b < 11; b += 10 {
+	s := 1
+	for a := -s; a < s; a++ {
+		for b := -s; b < s; b++ {
 			center := rl.NewVector3(
 				float32(a)+(0.9*rand.Float32()),
 				0.2,
