@@ -50,9 +50,11 @@ primitive Unmarshal
         try
             MessagePackDecoder.fixmap(b)?.usize()
         else
+            Debug("big map" where stream=DebugErr)
             try
                 MessagePackDecoder.map_16(b)?.usize()
             else
+                Debug("bigger map" where stream=DebugErr)
                 MessagePackDecoder.map_32(b)?.usize()
             end
         end
@@ -61,9 +63,11 @@ primitive Unmarshal
         try
             MessagePackDecoder.fixarray(b)?.usize()
         else
+            Debug("big array" where stream=DebugErr)
             try
                 MessagePackDecoder.array_16(b)?.usize()
             else
+                Debug("bigger array" where stream=DebugErr)
                 MessagePackDecoder.array_32(b)?.usize()
             end
         end

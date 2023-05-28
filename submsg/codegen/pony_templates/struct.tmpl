@@ -59,7 +59,8 @@ primitive UnmarshalMsgPack{{ .Name | snakeToCamel | capitalize }}
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
-                match MessagePackDecoder.fixstr(r)?
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
 {{- range $name, $type := .Fields }}
                 | "{{ $name | ponyType }}" =>
 {{- if $type | isPrimitive }}
@@ -71,7 +72,11 @@ primitive UnmarshalMsgPack{{ .Name | snakeToCamel | capitalize }}
 {{- end}}
 {{- end }}
                 else
-                    Debug("unknown field" where stream = DebugErr)
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
                 end
             end
         else

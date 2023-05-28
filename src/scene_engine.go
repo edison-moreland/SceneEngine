@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"sync"
 
@@ -166,6 +167,55 @@ func defaultScene() messages.Scene {
 				},
 			),
 		},
+	}
+
+	for a := -11; a < 11; a += 10 {
+		for b := -11; b < 11; b += 10 {
+			center := rl.NewVector3(
+				float32(a)+(0.9*rand.Float32()),
+				0.2,
+				float32(b)+(0.9*rand.Float32()),
+			)
+
+			if rl.Vector3Length(rl.Vector3Subtract(center, rl.NewVector3(4, 0.2, 0))) > 0.9 {
+				materialChoice := rand.Float32()
+				var material messages.Material
+				if materialChoice < 0.8 {
+					material = messages.MaterialFrom(messages.Lambert{
+						Albedo: messages.Color{
+							R: uint8(rand.Int()),
+							G: uint8(rand.Int()),
+							B: uint8(rand.Int()),
+						},
+					})
+				} else if materialChoice < 0.95 {
+					material = messages.MaterialFrom(messages.Metal{
+						Albedo: messages.Color{
+							R: uint8(rand.Intn(125) + 125),
+							G: uint8(rand.Intn(125) + 125),
+							B: uint8(rand.Intn(125) + 125),
+						},
+						Scatter: rand.Float64() / 2,
+					})
+				} else {
+					material = messages.MaterialFrom(messages.Dielectric{
+						IndexOfRefraction: 1.5,
+					})
+				}
+
+				objects = append(objects, messages.Object{
+					Material: material,
+					Shape: messages.ShapeFrom(messages.Sphere{
+						Origin: messages.Position{
+							X: float64(center.X),
+							Y: float64(center.Y),
+							Z: float64(center.Z),
+						},
+						Radius: 0.2,
+					}),
+				})
+			}
+		}
 	}
 
 	return messages.Scene{
