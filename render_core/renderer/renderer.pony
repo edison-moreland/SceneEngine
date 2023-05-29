@@ -21,7 +21,7 @@ primitive Renderer
         fj.Job[JobInput, JobOutput](
             WorkerBuilder(config, scene),
             PixelGenerator(config.image_width, config.image_height),
-            RenderTarget(config.image_height, on_pixel, on_complete),
+            RenderTarget(on_pixel, on_complete),
             auth
         ).start()
 
@@ -69,20 +69,14 @@ class PixelGenerator is fj.Generator[JobInput]
 class RenderTarget is fj.Collector[JobInput, JobOutput]
     let _on_pixel: OnPixelComplete
     let _on_complete: OnRenderComplete
-    let _height: U64
 
-    new iso create(height: U64, on_pixel: OnPixelComplete, on_complete: OnRenderComplete) =>
+    new iso create(on_pixel: OnPixelComplete, on_complete: OnRenderComplete) =>
         _on_pixel = on_pixel
         _on_complete = on_complete
-        _height = height
 
     fun ref collect(runner: fj.CollectorRunner[JobInput, JobOutput] ref, result: JobOutput) =>
         (let pixel, let color) = result
-
-        // Image renders upside-down, so flip it
-        let x = pixel._1
-        let y = (_height-1 - pixel._2)
-        _on_pixel(x, y, color)
+        _on_pixel(pixel._1, pixel._2, color)
 
     fun ref finish() =>
         _on_complete()

@@ -18,7 +18,7 @@ type RenderCore struct {
 
 	ready chan bool // notify when RenderCore is ready
 
-	pixelsOut chan messages.Pixel
+	pixelsOut chan []messages.Pixel
 }
 
 func Start(ctx context.Context, path string) (*RenderCore, error) {
@@ -86,9 +86,7 @@ func (r *RenderCore) PixelBatch(body []byte) error {
 		return err
 	}
 
-	for _, p := range pixels {
-		r.pixelsOut <- p
-	}
+	r.pixelsOut <- pixels
 
 	return nil
 }
@@ -121,9 +119,9 @@ func (r *RenderCore) SetConfig(c messages.Config) {
 }
 
 // StartRender will start rendering the next frame
-func (r *RenderCore) StartRender(scene messages.Scene) <-chan messages.Pixel {
+func (r *RenderCore) StartRender(scene messages.Scene) <-chan []messages.Pixel {
 	if r.pixelsOut == nil {
-		r.pixelsOut = make(chan messages.Pixel)
+		r.pixelsOut = make(chan []messages.Pixel)
 	}
 
 	body, err := msgpack.Marshal(scene)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"math/rand"
 	"os"
 	"sync"
 
@@ -13,12 +12,17 @@ import (
 
 	"github.com/edison-moreland/SceneEngine/src/core"
 	"github.com/edison-moreland/SceneEngine/src/core/messages"
+	"github.com/edison-moreland/SceneEngine/src/script"
 )
 
-var corePath string
+var (
+	corePath   string
+	scriptPath string
+)
 
 func init() {
 	flag.StringVar(&corePath, "core", "", "Path to rendercore")
+	flag.StringVar(&scriptPath, "script", "./scene.tengo", "Path to scene script")
 	flag.Parse()
 
 	if corePath == "" {
@@ -28,242 +32,106 @@ func init() {
 }
 
 func main() {
+	engineCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	logger, _ := zap.NewDevelopment()
 	defer logger.Sync()
 
 	logger.Info("Welcome to SceneEngine!")
 
-	logger.Info("Starting render core")
-	coreCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	logger.Info("Loading scene script")
+	config, requestScene, err := script.LoadSceneScript(engineCtx, scriptPath)
+	if err != nil {
+		logger.Fatal("Could not load script!", zap.Error(err))
+	}
 
-	renderCore, err := core.Start(coreCtx, corePath)
+	logger.Info("Starting render core")
+	renderCore, err := core.Start(engineCtx, corePath)
 	if err != nil {
 		logger.Fatal("Could not start core!", zap.Error(err))
 	}
-
 	renderCore.WaitForReady()
 	logger.Info("Render core ready!", zap.String("version", renderCore.Info()))
 
-	aspectRatio := float64(3.0 / 2.0)
-	width := uint64(1200)
-	height := uint64(float64(width) / aspectRatio)
-	renderCore.SetConfig(messages.Config{
-		AspectRatio: aspectRatio,
-		ImageWidth:  width,
-		ImageHeight: height,
-		Samples:     500,
-		Depth:       50,
-	})
+	renderCore.SetConfig(config)
 	renderCore.WaitForReady()
 	logger.Info("Set config")
 
-	rl.InitWindow(int32(width), int32(height), "SceneEngine")
+	logger.Info("Calculating scene")
+	scene := requestScene(1, 0)
+
+	rl.InitWindow(int32(config.ImageWidth), int32(config.ImageHeight), "SceneEngine")
 
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
 
 	logger.Info("Starting render")
-	target := NewRenderTarget(width, height, renderCore.StartRender(defaultScene()))
+	target := newRenderTarget(
+		config.ImageWidth,
+		config.ImageHeight,
+		renderCore.StartRender(scene),
+	)
 
 	for !rl.WindowShouldClose() {
+		target.RenderBuffer()
+
 		rl.BeginDrawing()
-
-		rl.ClearBackground(rl.Blue)
-
-		for x := uint64(0); x < width; x++ {
-			for y := uint64(0); y < height; y++ {
-				rl.DrawPixelV(target.Pixel(x, y))
-			}
-		}
-
+		rl.DrawTexture(target.Texture, 0, 0, rl.White)
 		rl.EndDrawing()
 	}
 }
 
 type renderTarget struct {
-	sync.RWMutex
-	image  []rl.Color
-	height uint64
+	sync.Mutex
+	rl.RenderTexture2D
+	buffer []messages.Pixel
 }
 
-func defaultScene() messages.Scene {
-	objects := []messages.Object{
-		{
-			Material: messages.MaterialFrom(
-				messages.Lambert{Albedo: messages.Color{
-					R: 127,
-					G: 127,
-					B: 127,
-				}},
-			),
-			Shape: messages.ShapeFrom(
-				messages.Sphere{
-					Origin: messages.Position{
-						X: 0,
-						Y: -1000,
-						Z: 0,
-					},
-					Radius: 1000,
-				},
-			),
-		},
-		{
-			Material: messages.MaterialFrom(
-				messages.Dielectric{
-					IndexOfRefraction: 1.5,
-				},
-			),
-			Shape: messages.ShapeFrom(
-				messages.Sphere{
-					Origin: messages.Position{
-						X: 0,
-						Y: 1,
-						Z: 0,
-					},
-					Radius: 1,
-				},
-			),
-		},
-		{
-			Material: messages.MaterialFrom(
-				messages.Lambert{
-					Albedo: messages.Color{
-						R: 102,
-						G: 51,
-						B: 25,
-					},
-				},
-			),
-			Shape: messages.ShapeFrom(
-				messages.Sphere{
-					Origin: messages.Position{
-						X: -4,
-						Y: 1,
-						Z: 0,
-					},
-					Radius: 1,
-				},
-			),
-		},
-		{
-			Material: messages.MaterialFrom(
-				messages.Metal{
-					Albedo: messages.Color{
-						R: 178,
-						G: 153,
-						B: 127,
-					},
-				},
-			),
-			Shape: messages.ShapeFrom(
-				messages.Sphere{
-					Origin: messages.Position{
-						X: 4,
-						Y: 1,
-						Z: 0,
-					},
-					Radius: 1,
-				},
-			),
-		},
-	}
-
-	for a := -11; a < 11; a += 10 {
-		for b := -11; b < 11; b += 10 {
-			center := rl.NewVector3(
-				float32(a)+(0.9*rand.Float32()),
-				0.2,
-				float32(b)+(0.9*rand.Float32()),
-			)
-
-			if rl.Vector3Length(rl.Vector3Subtract(center, rl.NewVector3(4, 0.2, 0))) > 0.9 {
-				materialChoice := rand.Float32()
-				var material messages.Material
-				if materialChoice < 0.8 {
-					material = messages.MaterialFrom(messages.Lambert{
-						Albedo: messages.Color{
-							R: uint8(rand.Int()),
-							G: uint8(rand.Int()),
-							B: uint8(rand.Int()),
-						},
-					})
-				} else if materialChoice < 0.95 {
-					material = messages.MaterialFrom(messages.Metal{
-						Albedo: messages.Color{
-							R: uint8(rand.Intn(125) + 125),
-							G: uint8(rand.Intn(125) + 125),
-							B: uint8(rand.Intn(125) + 125),
-						},
-						Scatter: rand.Float64() / 2,
-					})
-				} else {
-					material = messages.MaterialFrom(messages.Dielectric{
-						IndexOfRefraction: 1.5,
-					})
-				}
-
-				objects = append(objects, messages.Object{
-					Material: material,
-					Shape: messages.ShapeFrom(messages.Sphere{
-						Origin: messages.Position{
-							X: float64(center.X),
-							Y: float64(center.Y),
-							Z: float64(center.Z),
-						},
-						Radius: 0.2,
-					}),
-				})
-			}
-		}
-	}
-
-	return messages.Scene{
-		Objects: objects,
-		Camera: messages.Camera{
-			LookFrom: messages.Position{
-				X: 13,
-				Y: 2,
-				Z: 3,
-			},
-			LookAt: messages.Position{
-				X: 0,
-				Y: 0,
-				Z: 0,
-			},
-			Fov:      20,
-			Aperture: 0.1,
-		},
-	}
-}
-
-func NewRenderTarget(width uint64, height uint64, pixels <-chan messages.Pixel) *renderTarget {
+func newRenderTarget(width uint64, height uint64, pixels <-chan []messages.Pixel) *renderTarget {
 	var r renderTarget
-	r.image = make([]rl.Color, width*height)
-	r.height = height
+	r.buffer = make([]messages.Pixel, 0, 255) // TODO: How big should the buffer be to start?
+	r.RenderTexture2D = rl.LoadRenderTexture(int32(width), int32(height))
 
 	go func() {
-		for p := range pixels {
-			// TODO: Make sure pixels are laid out in the same order that they're read back
-			// TODO: Adjust submsg types to use float32
-
-			r.image[(p.X*height)+p.Y] = rl.NewColor(
-				p.Color.R,
-				p.Color.G,
-				p.Color.B,
-				255,
-			)
+		for batch := range pixels {
+			r.Lock()
+			r.buffer = append(r.buffer, batch...)
+			r.Unlock()
 		}
 	}()
 
 	return &r
 }
 
-func (r *renderTarget) Pixel(x, y uint64) (rl.Vector2, rl.Color) {
-	color := r.image[(x*r.height)+y]
+// RenderBuffer is called in the main thread to render buffered pixels to the texture
+func (r *renderTarget) RenderBuffer() {
+	r.Lock()
+	if len(r.buffer) == 0 {
+		r.Unlock()
+		return
+	}
+	defer r.Unlock()
 
-	return rl.Vector2{
-		X: float32(x),
-		Y: float32(y),
-	}, color
+	rl.BeginTextureMode(r.RenderTexture2D)
+	defer rl.EndTextureMode()
+
+	for _, pixel := range r.buffer {
+		rl.DrawPixel(
+			int32(pixel.X),
+			int32(pixel.Y),
+			rl.NewColor(
+				pixel.Color.R,
+				pixel.Color.G,
+				pixel.Color.B,
+				255,
+			),
+		)
+	}
+
+	r.buffer = r.buffer[:0]
+}
+
+func (r *renderTarget) Close() {
+	rl.UnloadRenderTexture(r.RenderTexture2D)
 }

@@ -24,7 +24,7 @@ function run_scene_engine() {
   generate_submsg_libraries
   compile_render_core
   compile_scene_engine
-  "${project_root}"/build/bin/scene_engine --core="${project_root}/build/bin/render_core"
+  "${project_root}"/build/bin/scene_engine --core="${project_root}/build/bin/render_core" --script="${project_root}/examples/scene.tengo"
 }
 
 case "${1:-run}" in

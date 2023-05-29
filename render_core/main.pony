@@ -17,13 +17,7 @@ actor Main is CoreServer
 
     var rand: Rand = Rand
 
-    var render_config: Config = Config(where
-            aspect_ratio' = 0.0,
-            image_width' = 0,
-            image_height' = 0,
-            samples' = 0,
-            depth' = 0
-        )
+    var render_config: Config = Config.zero()
 
     new create(env': Env) =>
         env = env'
@@ -57,7 +51,7 @@ actor Main is CoreServer
 
         let frame_scene = scene.Transform(UnmarshalMsgPackScene(consume r), render_config)
 
-        let pixel = PixelBatcher(client, 100) // TODO: Best pixel batch size?
+        let pixel = PixelBatcher(client, render_config.image_width.usize())
 
         Renderer.render(
             SchedulerInfoAuth(env.root),
