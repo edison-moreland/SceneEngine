@@ -67,60 +67,71 @@ func main() {
 	rl.SetTargetFPS(60)
 
 	logger.Info("Starting render")
-	target := NewRenderTarget(
+	target := newRenderTarget(
 		config.ImageWidth,
 		config.ImageHeight,
 		renderCore.StartRender(scene),
 	)
 
 	for !rl.WindowShouldClose() {
+		target.RenderBuffer()
+
 		rl.BeginDrawing()
-
-		rl.ClearBackground(rl.Blue)
-
-		for x := uint64(0); x < config.ImageWidth; x++ {
-			for y := uint64(0); y < config.ImageHeight; y++ {
-				rl.DrawPixelV(target.Pixel(x, y))
-			}
-		}
-
+		rl.DrawTexture(target.Texture, 0, 0, rl.White)
 		rl.EndDrawing()
 	}
 }
 
 type renderTarget struct {
-	sync.RWMutex
-	image  []rl.Color
-	height uint64
+	sync.Mutex
+	rl.RenderTexture2D
+	buffer []messages.Pixel
 }
 
-func NewRenderTarget(width uint64, height uint64, pixels <-chan messages.Pixel) *renderTarget {
+func newRenderTarget(width uint64, height uint64, pixels <-chan []messages.Pixel) *renderTarget {
 	var r renderTarget
-	r.image = make([]rl.Color, width*height)
-	r.height = height
+	r.buffer = make([]messages.Pixel, 0, 255) // TODO: How big should the buffer be to start?
+	r.RenderTexture2D = rl.LoadRenderTexture(int32(width), int32(height))
 
 	go func() {
-		for p := range pixels {
-			// TODO: Make sure pixels are laid out in the same order that they're read back
-			// TODO: Adjust submsg types to use float32
-
-			r.image[(p.X*height)+p.Y] = rl.NewColor(
-				p.Color.R,
-				p.Color.G,
-				p.Color.B,
-				255,
-			)
+		for batch := range pixels {
+			r.Lock()
+			r.buffer = append(r.buffer, batch...)
+			r.Unlock()
 		}
 	}()
 
 	return &r
 }
 
-func (r *renderTarget) Pixel(x, y uint64) (rl.Vector2, rl.Color) {
-	color := r.image[(x*r.height)+y]
+// RenderBuffer is called in the main thread to render buffered pixels to the texture
+func (r *renderTarget) RenderBuffer() {
+	r.Lock()
+	if len(r.buffer) == 0 {
+		r.Unlock()
+		return
+	}
+	defer r.Unlock()
 
-	return rl.Vector2{
-		X: float32(x),
-		Y: float32(y),
-	}, color
+	rl.BeginTextureMode(r.RenderTexture2D)
+	defer rl.EndTextureMode()
+
+	for _, pixel := range r.buffer {
+		rl.DrawPixel(
+			int32(pixel.X),
+			int32(pixel.Y),
+			rl.NewColor(
+				pixel.Color.R,
+				pixel.Color.G,
+				pixel.Color.B,
+				255,
+			),
+		)
+	}
+
+	r.buffer = r.buffer[:0]
+}
+
+func (r *renderTarget) Close() {
+	rl.UnloadRenderTexture(r.RenderTexture2D)
 }
