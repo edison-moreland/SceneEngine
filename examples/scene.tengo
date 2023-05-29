@@ -1,4 +1,6 @@
 fmt := import("fmt")
+color := import("color")
+vec3 := import("vec3")
 
 export {
     config: {
@@ -9,8 +11,19 @@ export {
     },
 
     scene: func(se, frame, seconds) {
-        fmt.println("I'm a script!")
+        se.Object(
+            se.Sphere(vec3.New(-1, 0, 0), 1),
+            se.Lambert(color.Red())
+        )
 
-        se.Spheres(2)
+        se.Object(
+            se.Sphere(vec3.New(1, 0, 0), 1),
+            se.Lambert(color.Blue())
+        )
+
+        se.Camera(
+            vec3.New(0, 0, 4),
+            vec3.New(0, 0, 0)
+        )
     }
 }
