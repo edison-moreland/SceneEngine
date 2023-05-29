@@ -1,0 +1,12 @@
+runtime := import("runtime")
+userscript := import("userscript")
+
+runtime.config(userscript.config)
+
+for {
+    request := runtime.next()
+
+    userscript.scene(request.frame, request.seconds)
+
+    request.done()
+}

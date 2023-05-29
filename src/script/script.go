@@ -1,66 +1,193 @@
 package script
 
 import (
+	"context"
+	_ "embed"
 	"errors"
 	"fmt"
 	"os"
 
 	"github.com/d5/tengo/v2"
+	"github.com/d5/tengo/v2/stdlib"
 
 	"github.com/edison-moreland/SceneEngine/src/core/messages"
 )
 
-type SceneScript struct {
-	compiled *tengo.Compiled
+var (
+	ErrConfigIsNotMap           = errors.New("config is not a map")
+	ErrUnknownConfigValue       = errors.New("unknown config value")
+	ErrConfigValueIncorrectType = errors.New("config value has the wrong type")
+)
+
+//go:embed runtime.tengo
+var runtimeSource []byte
+
+type GenerateScene func(frame uint32, seconds float64) messages.Scene
+
+type sceneRequest struct {
+	frame    int64
+	seconds  float64
+	response chan<- messages.Scene
 }
 
-func LoadSceneScript(path string) (*SceneScript, error) {
-	source, err := os.ReadFile(path)
+func LoadSceneScript(ctx context.Context, sceneScript string) (messages.Config, GenerateScene, error) {
+	request := make(chan sceneRequest)
+
+	config, err := startScript(ctx, sceneScript, request)
 	if err != nil {
-		return nil, err
+		close(request)
+		return config, nil, err
 	}
 
-	script := tengo.NewScript(source)
+	return config, func(frame uint32, seconds float64) messages.Scene {
+		responseChan := make(chan messages.Scene)
+		defer close(responseChan)
 
-	compiled, err := script.Run()
-	if err != nil {
-		return nil, err
-	}
+		request <- sceneRequest{
+			frame:    int64(frame),
+			seconds:  seconds,
+			response: responseChan,
+		}
 
-	return &SceneScript{
-		compiled: compiled,
+		return <-responseChan
 	}, nil
 }
 
-var (
-	ErrConfigIsUndefined  = errors.New("config is undefined")
-	ErrConfigIsNotMap     = errors.New("config is not a map")
-	ErrUnknownConfigValue = errors.New("unknown config value")
-)
-
-func (s *SceneScript) Config() (messages.Config, error) {
+func startScript(ctx context.Context, sceneScript string, requests chan sceneRequest) (messages.Config, error) {
 	var config messages.Config
 
-	configVar := s.compiled.Get("config")
-	if configVar.IsUndefined() {
-		return config, ErrConfigIsUndefined
+	source, err := os.ReadFile(sceneScript)
+	if err != nil {
+		return config, err
 	}
 
-	configMap := configVar.Map()
-	if configMap == nil {
-		return config, ErrConfigIsNotMap
-	}
+	configReturn := make(chan messages.Config)
+	defer close(configReturn)
 
-	for key, val := range configMap {
+	moduleMap := tengo.NewModuleMap()
+	moduleMap.AddSourceModule("userscript", source)
+	moduleMap.AddBuiltinModule("fmt", stdlib.BuiltinModules["fmt"])
+	moduleMap.AddBuiltinModule("math", stdlib.BuiltinModules["math"])
+	moduleMap.AddBuiltinModule("runtime", map[string]tengo.Object{
+		"config": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
+			// Runtime is giving us the config defined by the userscript
+			if len(args) != 1 {
+				panic("config expects more than one argument")
+			}
+
+			configMap, ok := args[0].(*tengo.Map)
+			if !ok {
+				return nil, ErrConfigIsNotMap
+			}
+
+			userConfig, err := getConfig(configMap)
+			if err != nil {
+				return nil, err
+			}
+
+			configReturn <- userConfig
+
+			return nil, nil
+		}},
+		"next": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
+			// Runtime is asking for the next request
+			// When a request is ready, it returns an object with:
+			//   - A callback to call when request is done
+			//   - The two scene arguments (frame, seconds)
+			request := <-requests
+
+			return &tengo.Map{Value: map[string]tengo.Object{
+				"frame":   &tengo.Int{Value: request.frame},
+				"seconds": &tengo.Float{Value: request.seconds},
+				"done": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
+					// Right now it returns a very empty scene
+
+					request.response <- messages.Scene{
+						Camera: messages.Camera{
+							Aperture: 0.1,
+							Fov:      90,
+							LookAt: messages.Position{
+								X: 0,
+								Y: 0,
+								Z: 0,
+							},
+							LookFrom: messages.Position{
+								X: 5,
+								Y: 5,
+								Z: 5,
+							},
+						},
+						Objects: []messages.Object{
+							{
+								Material: messages.MaterialFrom(messages.Lambert{
+									Albedo: messages.Color{
+										R: 150,
+										G: 150,
+										B: 150,
+									}}),
+								Shape: messages.ShapeFrom(messages.Sphere{
+									Origin: messages.Position{
+										X: 0,
+										Y: 0,
+										Z: 0,
+									},
+									Radius: 1,
+								}),
+							},
+						},
+					}
+
+					return nil, nil
+				}},
+			}}, nil
+
+		}},
+	})
+
+	runtime := tengo.NewScript(runtimeSource)
+	runtime.SetImports(moduleMap)
+
+	go func() {
+		defer close(requests)
+
+		_, err := runtime.RunContext(ctx)
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	return <-configReturn, nil
+}
+
+func getConfig(o *tengo.Map) (messages.Config, error) {
+	var config messages.Config
+
+	for key, val := range o.Value {
 		switch key {
 		case "depth":
-			config.Depth = uint64(val.(int64))
+			depth, ok := tengo.ToInt(val)
+			if !ok {
+				return config, fmt.Errorf("%w: got %T for %s", ErrConfigValueIncorrectType, val, key)
+			}
+			config.Depth = uint64(depth)
 		case "samples":
-			config.Samples = uint64(val.(int64))
+			samples, ok := tengo.ToInt(val)
+			if !ok {
+				return config, fmt.Errorf("%w: got %T for %s", ErrConfigValueIncorrectType, val, key)
+			}
+			config.Samples = uint64(samples)
 		case "image_width":
-			config.ImageWidth = uint64(val.(int64))
+			imageWidth, ok := tengo.ToInt(val)
+			if !ok {
+				return config, fmt.Errorf("%w: got %T for %s", ErrConfigValueIncorrectType, val, key)
+			}
+			config.ImageWidth = uint64(imageWidth)
 		case "aspect_ratio":
-			config.AspectRatio = val.(float64)
+			aspectRatio, ok := tengo.ToFloat64(val)
+			if !ok {
+				return config, fmt.Errorf("%w: got %T for %s", ErrConfigValueIncorrectType, val, key)
+			}
+			config.AspectRatio = aspectRatio
 		default:
 			return config, fmt.Errorf("%w: %s", ErrUnknownConfigValue, key)
 		}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"math/rand"
 	"os"
 	"sync"
 
@@ -23,7 +22,7 @@ var (
 
 func init() {
 	flag.StringVar(&corePath, "core", "", "Path to rendercore")
-	flag.StringVar(&scriptPath, "script", "./scene.se", "Path to scene script")
+	flag.StringVar(&scriptPath, "script", "./scene.tengo", "Path to scene script")
 	flag.Parse()
 
 	if corePath == "" {
@@ -33,48 +32,45 @@ func init() {
 }
 
 func main() {
+	engineCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	logger, _ := zap.NewDevelopment()
 	defer logger.Sync()
 
 	logger.Info("Welcome to SceneEngine!")
 
 	logger.Info("Loading scene script")
-	sceneScript, err := script.LoadSceneScript(scriptPath)
+	config, requestScene, err := script.LoadSceneScript(engineCtx, scriptPath)
 	if err != nil {
 		logger.Fatal("Could not load script!", zap.Error(err))
 	}
 
-	renderConfig, err := sceneScript.Config()
-	if err != nil {
-		logger.Fatal("Could not get render config!", zap.Error(err))
-	}
-
 	logger.Info("Starting render core")
-	coreCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	renderCore, err := core.Start(coreCtx, corePath)
+	renderCore, err := core.Start(engineCtx, corePath)
 	if err != nil {
 		logger.Fatal("Could not start core!", zap.Error(err))
 	}
-
 	renderCore.WaitForReady()
 	logger.Info("Render core ready!", zap.String("version", renderCore.Info()))
 
-	renderCore.SetConfig(renderConfig)
+	renderCore.SetConfig(config)
 	renderCore.WaitForReady()
 	logger.Info("Set config")
 
-	rl.InitWindow(int32(renderConfig.ImageWidth), int32(renderConfig.ImageHeight), "SceneEngine")
+	logger.Info("Calculating scene")
+	scene := requestScene(1, 0)
+
+	rl.InitWindow(int32(config.ImageWidth), int32(config.ImageHeight), "SceneEngine")
 
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
 
 	logger.Info("Starting render")
 	target := NewRenderTarget(
-		renderConfig.ImageWidth,
-		renderConfig.ImageHeight,
-		renderCore.StartRender(defaultScene()),
+		config.ImageWidth,
+		config.ImageHeight,
+		renderCore.StartRender(scene),
 	)
 
 	for !rl.WindowShouldClose() {
@@ -82,8 +78,8 @@ func main() {
 
 		rl.ClearBackground(rl.Blue)
 
-		for x := uint64(0); x < renderConfig.ImageWidth; x++ {
-			for y := uint64(0); y < renderConfig.ImageHeight; y++ {
+		for x := uint64(0); x < config.ImageWidth; x++ {
+			for y := uint64(0); y < config.ImageHeight; y++ {
 				rl.DrawPixelV(target.Pixel(x, y))
 			}
 		}
@@ -96,157 +92,6 @@ type renderTarget struct {
 	sync.RWMutex
 	image  []rl.Color
 	height uint64
-}
-
-func defaultScene() messages.Scene {
-	objects := []messages.Object{
-		{
-			Material: messages.MaterialFrom(
-				messages.Lambert{Albedo: messages.Color{
-					R: 127,
-					G: 127,
-					B: 127,
-				}},
-			),
-			Shape: messages.ShapeFrom(
-				messages.Sphere{
-					Origin: messages.Position{
-						X: 0,
-						Y: -1000,
-						Z: 0,
-					},
-					Radius: 1000,
-				},
-			),
-		},
-		{
-			Material: messages.MaterialFrom(
-				messages.Dielectric{
-					IndexOfRefraction: 1.5,
-				},
-			),
-			Shape: messages.ShapeFrom(
-				messages.Sphere{
-					Origin: messages.Position{
-						X: 0,
-						Y: 1,
-						Z: 0,
-					},
-					Radius: 1,
-				},
-			),
-		},
-		{
-			Material: messages.MaterialFrom(
-				messages.Lambert{
-					Albedo: messages.Color{
-						R: 102,
-						G: 51,
-						B: 25,
-					},
-				},
-			),
-			Shape: messages.ShapeFrom(
-				messages.Sphere{
-					Origin: messages.Position{
-						X: -4,
-						Y: 1,
-						Z: 0,
-					},
-					Radius: 1,
-				},
-			),
-		},
-		{
-			Material: messages.MaterialFrom(
-				messages.Metal{
-					Albedo: messages.Color{
-						R: 178,
-						G: 153,
-						B: 127,
-					},
-				},
-			),
-			Shape: messages.ShapeFrom(
-				messages.Sphere{
-					Origin: messages.Position{
-						X: 4,
-						Y: 1,
-						Z: 0,
-					},
-					Radius: 1,
-				},
-			),
-		},
-	}
-
-	s := 1
-	for a := -s; a < s; a++ {
-		for b := -s; b < s; b++ {
-			center := rl.NewVector3(
-				float32(a)+(0.9*rand.Float32()),
-				0.2,
-				float32(b)+(0.9*rand.Float32()),
-			)
-
-			if rl.Vector3Length(rl.Vector3Subtract(center, rl.NewVector3(4, 0.2, 0))) > 0.9 {
-				materialChoice := rand.Float32()
-				var material messages.Material
-				if materialChoice < 0.8 {
-					material = messages.MaterialFrom(messages.Lambert{
-						Albedo: messages.Color{
-							R: uint8(rand.Int()),
-							G: uint8(rand.Int()),
-							B: uint8(rand.Int()),
-						},
-					})
-				} else if materialChoice < 0.95 {
-					material = messages.MaterialFrom(messages.Metal{
-						Albedo: messages.Color{
-							R: uint8(rand.Intn(125) + 125),
-							G: uint8(rand.Intn(125) + 125),
-							B: uint8(rand.Intn(125) + 125),
-						},
-						Scatter: rand.Float64() / 2,
-					})
-				} else {
-					material = messages.MaterialFrom(messages.Dielectric{
-						IndexOfRefraction: 1.5,
-					})
-				}
-
-				objects = append(objects, messages.Object{
-					Material: material,
-					Shape: messages.ShapeFrom(messages.Sphere{
-						Origin: messages.Position{
-							X: float64(center.X),
-							Y: float64(center.Y),
-							Z: float64(center.Z),
-						},
-						Radius: 0.2,
-					}),
-				})
-			}
-		}
-	}
-
-	return messages.Scene{
-		Objects: objects,
-		Camera: messages.Camera{
-			LookFrom: messages.Position{
-				X: 13,
-				Y: 2,
-				Z: 3,
-			},
-			LookAt: messages.Position{
-				X: 0,
-				Y: 0,
-				Z: 0,
-			},
-			Fov:      20,
-			Aperture: 0.1,
-		},
-	}
 }
 
 func NewRenderTarget(width uint64, height uint64, pixels <-chan messages.Pixel) *renderTarget {
