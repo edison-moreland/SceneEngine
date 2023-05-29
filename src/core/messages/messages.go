@@ -7,50 +7,6 @@ import (
 )
 
 const (
-	EngineMsgCoreReady  submsg.MsgId = 0
-	EngineMsgCoreInfo   submsg.MsgId = 1
-	EngineMsgPixelBatch submsg.MsgId = 2
-)
-
-type EngineServer interface {
-	CoreReady(body []byte) error
-	CoreInfo(body []byte) error
-	PixelBatch(body []byte) error
-}
-
-func EngineRouter(s EngineServer) submsg.MsgReceiver {
-	return func(id submsg.MsgId, body []byte) error {
-		switch id {
-		case EngineMsgCoreReady:
-			return s.CoreReady(body)
-		case EngineMsgCoreInfo:
-			return s.CoreInfo(body)
-		case EngineMsgPixelBatch:
-			return s.PixelBatch(body)
-		default:
-			return submsg.ErrMsgIdUnknown
-		}
-	}
-}
-
-type EngineClient struct {
-	s submsg.MsgSender
-}
-
-func NewEngineClient(s submsg.MsgSender) *EngineClient {
-	return &EngineClient{s: s}
-}
-func (c *EngineClient) CoreReady(b []byte) {
-	c.s(EngineMsgCoreReady, b)
-}
-func (c *EngineClient) CoreInfo(b []byte) {
-	c.s(EngineMsgCoreInfo, b)
-}
-func (c *EngineClient) PixelBatch(b []byte) {
-	c.s(EngineMsgPixelBatch, b)
-}
-
-const (
 	CoreMsgInfo        submsg.MsgId = 0
 	CoreMsgConfig      submsg.MsgId = 1
 	CoreMsgRenderFrame submsg.MsgId = 2
@@ -92,6 +48,50 @@ func (c *CoreClient) Config(b []byte) {
 }
 func (c *CoreClient) RenderFrame(b []byte) {
 	c.s(CoreMsgRenderFrame, b)
+}
+
+const (
+	EngineMsgCoreReady  submsg.MsgId = 0
+	EngineMsgCoreInfo   submsg.MsgId = 1
+	EngineMsgPixelBatch submsg.MsgId = 2
+)
+
+type EngineServer interface {
+	CoreReady(body []byte) error
+	CoreInfo(body []byte) error
+	PixelBatch(body []byte) error
+}
+
+func EngineRouter(s EngineServer) submsg.MsgReceiver {
+	return func(id submsg.MsgId, body []byte) error {
+		switch id {
+		case EngineMsgCoreReady:
+			return s.CoreReady(body)
+		case EngineMsgCoreInfo:
+			return s.CoreInfo(body)
+		case EngineMsgPixelBatch:
+			return s.PixelBatch(body)
+		default:
+			return submsg.ErrMsgIdUnknown
+		}
+	}
+}
+
+type EngineClient struct {
+	s submsg.MsgSender
+}
+
+func NewEngineClient(s submsg.MsgSender) *EngineClient {
+	return &EngineClient{s: s}
+}
+func (c *EngineClient) CoreReady(b []byte) {
+	c.s(EngineMsgCoreReady, b)
+}
+func (c *EngineClient) CoreInfo(b []byte) {
+	c.s(EngineMsgCoreInfo, b)
+}
+func (c *EngineClient) PixelBatch(b []byte) {
+	c.s(EngineMsgPixelBatch, b)
 }
 
 type MsgCoreInfo struct {

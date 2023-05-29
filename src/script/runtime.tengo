@@ -6,7 +6,7 @@ runtime.config(userscript.config)
 for {
     request := runtime.next()
 
-    userscript.scene(request.frame, request.seconds)
+    userscript.scene(request.scene_gen, request.frame, request.seconds)
 
     request.done()
 }

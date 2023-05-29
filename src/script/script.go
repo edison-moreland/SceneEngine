@@ -71,6 +71,10 @@ func startScript(ctx context.Context, sceneScript string, requests chan sceneReq
 	moduleMap.AddBuiltinModule("runtime", map[string]tengo.Object{
 		"config": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
 			// Runtime is giving us the config defined by the userscript
+			if configReturn == nil {
+				panic("config can only be called once")
+			}
+
 			if len(args) != 1 {
 				panic("config expects more than one argument")
 			}
@@ -93,49 +97,65 @@ func startScript(ctx context.Context, sceneScript string, requests chan sceneReq
 			// Runtime is asking for the next request
 			// When a request is ready, it returns an object with:
 			//   - A callback to call when request is done
+			//   - An object for creating scene objects
 			//   - The two scene arguments (frame, seconds)
 			request := <-requests
+
+			// This scene is populated by the scene_gen object
+			scene := messages.Scene{
+				Camera: messages.Camera{
+					Aperture: 0.1,
+					Fov:      90,
+					LookAt: messages.Position{
+						X: 0,
+						Y: 0,
+						Z: 0,
+					},
+					LookFrom: messages.Position{
+						X: 5,
+						Y: 5,
+						Z: 5,
+					},
+				},
+			}
 
 			return &tengo.Map{Value: map[string]tengo.Object{
 				"frame":   &tengo.Int{Value: request.frame},
 				"seconds": &tengo.Float{Value: request.seconds},
-				"done": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-					// Right now it returns a very empty scene
+				"scene_gen": &tengo.Map{Value: map[string]tengo.Object{
+					"Spheres": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
+						if len(args) != 1 {
+							return nil, fmt.Errorf("expected 1 argument")
+						}
 
-					request.response <- messages.Scene{
-						Camera: messages.Camera{
-							Aperture: 0.1,
-							Fov:      90,
-							LookAt: messages.Position{
-								X: 0,
-								Y: 0,
-								Z: 0,
-							},
-							LookFrom: messages.Position{
-								X: 5,
-								Y: 5,
-								Z: 5,
-							},
-						},
-						Objects: []messages.Object{
-							{
-								Material: messages.MaterialFrom(messages.Lambert{
-									Albedo: messages.Color{
-										R: 150,
-										G: 150,
-										B: 150,
-									}}),
+						sphereCount, ok := tengo.ToInt(args[0])
+						if !ok {
+							return nil, fmt.Errorf("expected first argument to be int")
+						}
+
+						for i := 0; i < sphereCount; i++ {
+							scene.Objects = append(scene.Objects, messages.Object{
+								Material: messages.MaterialFrom(messages.Lambert{Albedo: messages.Color{
+									B: 150,
+									G: 150,
+									R: 150,
+								}}),
 								Shape: messages.ShapeFrom(messages.Sphere{
 									Origin: messages.Position{
-										X: 0,
+										X: float64(i),
 										Y: 0,
 										Z: 0,
 									},
 									Radius: 1,
 								}),
-							},
-						},
-					}
+							})
+						}
+
+						return nil, nil
+					}},
+				}},
+				"done": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
+					request.response <- scene
 
 					return nil, nil
 				}},

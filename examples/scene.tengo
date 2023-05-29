@@ -3,12 +3,14 @@ fmt := import("fmt")
 export {
     config: {
         aspect_ratio: (3.0 / 2.0),
-        image_width: 1000,
-        samples: 500,
+        image_width: 400,
+        samples: 50,
         depth: 50
     },
 
-    scene: func(frame, seconds) {
+    scene: func(se, frame, seconds) {
         fmt.println("I'm a script!")
+
+        se.Spheres(2)
     }
 }
