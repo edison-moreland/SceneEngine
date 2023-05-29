@@ -71,6 +71,8 @@ func startScript(ctx context.Context, sceneScript string, requests chan sceneReq
 	moduleMap.AddBuiltinModule("math", stdlib.BuiltinModules["math"])
 	moduleMap.AddBuiltinModule("vec3", libraries.Vec3Module)
 	moduleMap.AddBuiltinModule("color", libraries.ColorModule)
+	moduleMap.AddBuiltinModule("shape", libraries.ShapeModule)
+	moduleMap.AddBuiltinModule("material", libraries.MaterialModule)
 	moduleMap.AddBuiltinModule("runtime", map[string]tengo.Object{
 		"config": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
 			// Runtime is giving us the config defined by the userscript
@@ -126,64 +128,25 @@ func startScript(ctx context.Context, sceneScript string, requests chan sceneReq
 				"frame":   &tengo.Int{Value: request.frame},
 				"seconds": &tengo.Float{Value: request.seconds},
 				"scene_gen": &tengo.Map{Value: map[string]tengo.Object{
-					"Sphere": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-						// Sphere takes two arguments, origin and radius
-						if len(args) != 2 {
-							return nil, tengo.ErrWrongNumArguments
-						}
 
-						origin, ok := args[0].(*libraries.Vec3)
-						if !ok {
-							return nil, tengo.ErrInvalidArgumentType{Name: "origin"}
-						}
-
-						radius, ok := tengo.ToFloat64(args[1])
-						if !ok {
-							return nil, tengo.ErrInvalidArgumentType{Name: "radius"}
-						}
-
-						return &Opaque{Value: messages.ShapeFrom(messages.Sphere{
-							Origin: origin.Position(),
-							Radius: radius,
-						})}, nil
-					}},
-					"Lambert": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-						// Lambert takes one argument, a color
-						if len(args) != 1 {
-							return nil, tengo.ErrWrongNumArguments
-						}
-
-						albedo, ok := args[0].(*libraries.Color)
-						if !ok {
-							return nil, tengo.ErrInvalidArgumentType{
-								Name:     "albedo",
-								Expected: "Color",
-								Found:    args[0].TypeName(),
-							}
-						}
-
-						return &Opaque{Value: messages.MaterialFrom(messages.Lambert{
-							Albedo: albedo.Value,
-						})}, nil
-					}},
 					"Object": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
 						if len(args) != 2 {
 							return nil, tengo.ErrWrongNumArguments
 						}
 
-						shape, ok := args[0].(*Opaque).Value.(messages.Shape)
+						shape, ok := args[0].(*libraries.Shape)
 						if !ok {
 							return nil, tengo.ErrInvalidArgumentType{Name: "shape"}
 						}
 
-						material, ok := args[1].(*Opaque).Value.(messages.Material)
+						material, ok := args[1].(*libraries.Material)
 						if !ok {
 							return nil, tengo.ErrInvalidArgumentType{Name: "material"}
 						}
 
 						scene.Objects = append(scene.Objects, messages.Object{
-							Material: material,
-							Shape:    shape,
+							Material: material.Material,
+							Shape:    shape.Shape,
 						})
 
 						return nil, nil
