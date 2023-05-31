@@ -35,6 +35,7 @@ func Start(ctx context.Context, path string) (*RenderCore, error) {
 		return nil, err
 	}
 	core.client = messages.NewCoreClient(sendMsg)
+	core.WaitForReady()
 
 	return &core, nil
 }

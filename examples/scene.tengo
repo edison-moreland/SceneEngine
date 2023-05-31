@@ -10,18 +10,23 @@ export {
         image_width: 400,
         samples: 100,
         depth: 50,
-        frame_count: (60 * 5),
-        frame_speed: 60
+        frame_count: (30 * 5),
+        frame_speed: 30
     },
 
     scene: func(se, frame, seconds) {
+        speed_multiplier := 20
+
+        sec_sin := math.sin(seconds*speed_multiplier)
+        sec_cos := math.cos(seconds*speed_multiplier)
+
         se.Object(
-            s.Sphere(vec3.New(math.sin(seconds), 1, math.cos(seconds)), 1),
+            s.Sphere(vec3.New(sec_sin, 1, sec_cos), 1),
             m.Lambert(color.New(102, 51, 25))
         )
 
         se.Object(
-            s.Sphere(vec3.New(-math.sin(seconds), 1, -math.cos(seconds)), 1),
+            s.Sphere(vec3.New(-sec_sin, 1, -sec_cos), 1),
             m.Metal(color.New(178, 153, 127), 0.0)
         )
 

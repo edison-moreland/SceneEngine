@@ -4,11 +4,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
+	"os/exec"
 	"path"
+	"strconv"
 	"strings"
-	"sync"
+	"time"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
 	"go.uber.org/zap"
@@ -18,17 +19,19 @@ import (
 	"github.com/edison-moreland/SceneEngine/scene_engine/script"
 )
 
-type EnginePhase int
-
-const (
-	Idle EnginePhase = iota
-	Rendering
-)
+//type EnginePhase int
+//
+//const (
+//	Idle EnginePhase = iota
+//	Rendering
+//)
 
 var (
 	corePath   string
 	scriptPath string
 )
+
+var backgroundColor = rl.LightGray
 
 func init() {
 	flag.StringVar(&corePath, "core", "", "Path to rendercore")
@@ -51,7 +54,7 @@ func main() {
 	logger.Info("Welcome to SceneEngine!")
 
 	logger.Info("Loading scene script")
-	config, requestScene, err := script.LoadSceneScript(engineCtx, scriptPath)
+	config, scene, err := script.LoadSceneScript(engineCtx, scriptPath)
 	if err != nil {
 		logger.Fatal("Could not load script!", zap.Error(err))
 	}
@@ -66,166 +69,20 @@ func main() {
 	if err != nil {
 		logger.Fatal("Could not start core!", zap.Error(err))
 	}
-	renderCore.WaitForReady()
-	renderCore.SetConfig(config)
-	renderCore.WaitForReady()
 	logger.Info("Render core ready!", zap.String("version", renderCore.Info()))
+	renderCore.SetConfig(config)
 
 	rl.InitWindow(int32(config.ImageWidth), int32(config.ImageHeight), "SceneEngine")
-
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
 
-	currentFrame := uint64(1)
-
-	startRender := func(frame uint64) <-chan []messages.Pixel {
-		logger.Info("Rendering frame", zap.Uint64("frame", currentFrame))
-
-		return renderCore.StartRender(requestScene(uint32(frame), float64(frame)*(1.0/float64(config.FrameSpeed))))
+	err = RunPhases(logger, Idle, map[AppPhaseId]AppPhase{
+		Idle:   IdlePhase(),
+		Render: RenderPhase(renderCore, scene, config, exportDir),
+	})
+	if err != nil {
+		logger.Fatal("Render machine br0k3", zap.Error(err))
 	}
-
-	target := newRenderTarget(
-		config.ImageWidth,
-		config.ImageHeight,
-		startRender(currentFrame))
-
-	phase := Rendering
-
-drawLoop:
-	for !rl.WindowShouldClose() {
-		switch phase {
-		case Rendering:
-			target.RenderBuffer()
-			if target.done {
-				phase = Idle
-			}
-
-		case Idle:
-			if target != nil {
-				target.Export(exportDir, currentFrame)
-
-				currentFrame += 1
-				if currentFrame > config.FrameCount {
-					break drawLoop
-				}
-
-				phase = Rendering
-				renderCore.WaitForReady() // This should return immediately
-				target.Reset(startRender(currentFrame))
-			}
-		}
-
-		rl.BeginDrawing()
-
-		switch phase {
-		case Rendering:
-			rl.DrawTextureV(target.Texture, rl.Vector2Zero(), rl.White)
-		}
-
-		rl.EndDrawing()
-	}
-	logger.Info("Done!")
-
-	if config.FrameSpeed > 0 {
-		logger.Info("Exporting video")
-		cmd, err := ffmpegEncodeVideo(engineCtx, config, exportDir)
-		if err != nil {
-			log.Fatal("Could not start ffmpeg to export video", zap.Error(err))
-		}
-		err = cmd.Wait()
-		if err != nil {
-			log.Fatal("Err exporting video", zap.Error(err))
-		}
-	}
-}
-
-type renderTarget struct {
-	sync.Mutex
-	rl.RenderTexture2D
-	buffer []messages.Pixel
-	done   bool
-}
-
-func newRenderTarget(width uint64, height uint64, pixels <-chan []messages.Pixel) *renderTarget {
-	var r renderTarget
-	r.buffer = make([]messages.Pixel, 0, 255) // TODO: How big should the buffer be to start?
-	r.RenderTexture2D = rl.LoadRenderTexture(int32(width), int32(height))
-	r.done = true
-
-	r.Reset(pixels)
-	//go func() {
-	//	for batch := range pixels {
-	//		r.Lock()
-	//		r.buffer = append(r.buffer, batch...)
-	//		r.Unlock()
-	//	}
-	//	r.done = true
-	//}()
-
-	return &r
-}
-
-// RenderBuffer is called in the main thread to render buffered pixels to the texture
-func (r *renderTarget) RenderBuffer() {
-	r.Lock()
-	if len(r.buffer) == 0 {
-		r.Unlock()
-		return
-	}
-	defer r.Unlock()
-
-	rl.BeginTextureMode(r.RenderTexture2D)
-	defer rl.EndTextureMode()
-
-	for _, pixel := range r.buffer {
-		rl.DrawPixel(
-			int32(pixel.X),
-			int32(pixel.Y),
-			rl.NewColor(
-				pixel.Color.R,
-				pixel.Color.G,
-				pixel.Color.B,
-				255,
-			),
-		)
-	}
-
-	r.buffer = r.buffer[:0]
-}
-
-func (r *renderTarget) Export(dir string, frame uint64) {
-	exportName := path.Join(dir, fmt.Sprintf("frame-%d.png", frame))
-
-	r.Lock()
-	image := rl.LoadImageFromTexture(r.Texture)
-	rl.ExportImage(*image, exportName)
-	r.Unlock()
-}
-
-func (r *renderTarget) Reset(pixels <-chan []messages.Pixel) {
-	r.Lock()
-
-	if !r.done {
-		panic("can't reset if not done")
-	}
-	r.done = false
-
-	r.Unlock()
-
-	go func() {
-		for batch := range pixels {
-			r.Lock()
-			r.buffer = append(r.buffer, batch...)
-			r.Unlock()
-		}
-		r.done = true
-	}()
-}
-
-func (r *renderTarget) Close() {
-	r.Lock()
-	rl.UnloadRenderTexture(r.RenderTexture2D)
-	r.Unlock()
 }
 
 // prepareFS will make sure an empty folder exists for output, removing any old files
@@ -240,4 +97,211 @@ func prepareFS(scriptPath string) (string, error) {
 	}
 
 	return exportDir, os.Mkdir(exportDir, os.FileMode(0777))
+}
+
+type rollingAverage struct {
+	samples    []time.Duration
+	sampleSize int
+}
+
+func (r *rollingAverage) HasSamples() bool {
+	return len(r.samples) > 0
+}
+
+func (r *rollingAverage) Sample(t time.Duration) {
+	if len(r.samples) == r.sampleSize {
+		r.samples = r.samples[1:]
+	}
+	r.samples = append(r.samples, t)
+}
+
+func (r *rollingAverage) Average() time.Duration {
+	average := time.Duration(0)
+	count := 0
+	for _, s := range r.samples {
+		average += s
+		count += 1
+	}
+
+	return average / time.Duration(count)
+}
+
+type AppPhaseId int
+type AppPhase interface {
+	Think() (next AppPhaseId, err error)
+	Draw()
+	Complete() error
+}
+
+func RunPhases(logger *zap.Logger, startPhase AppPhaseId, phases map[AppPhaseId]AppPhase) error {
+	current := startPhase
+
+	defer func() {
+		for _, phase := range phases {
+			if err := phase.Complete(); err != nil {
+				logger.Error("Err completing phase", zap.Error(err))
+			}
+		}
+	}()
+
+	for !rl.WindowShouldClose() {
+		next, err := phases[current].Think()
+		if err != nil {
+			return err
+		}
+
+		rl.BeginDrawing()
+		rl.ClearBackground(backgroundColor)
+		phases[current].Draw()
+		rl.EndDrawing()
+
+		current = next
+	}
+
+	return nil
+}
+
+const (
+	Idle AppPhaseId = iota
+	Render
+)
+
+type idle struct {
+	renderButton Button
+}
+
+func IdlePhase() AppPhase {
+	return &idle{
+		renderButton: NewButton("Render", rl.Gray, 5, 5),
+	}
+}
+
+func (i *idle) Think() (AppPhaseId, error) {
+	if i.renderButton.Down() {
+		return Render, nil
+	}
+
+	return Idle, nil
+}
+
+func (i *idle) Draw() {
+	i.renderButton.Draw()
+}
+
+func (i *idle) Complete() error {
+	return nil
+}
+
+type render struct {
+	core       *core.RenderCore
+	target     *renderTarget
+	scene      script.GenerateScene
+	config     messages.Config
+	exportPath string
+
+	exportCmd *exec.Cmd
+
+	renderActive bool
+
+	currentFrame   uint64
+	lastFrameStart time.Time
+	frameElapsed   rollingAverage
+}
+
+func RenderPhase(core *core.RenderCore, scene script.GenerateScene, config messages.Config, exportDir string) AppPhase {
+	r := render{
+		core:       core,
+		scene:      scene,
+		config:     config,
+		exportPath: exportDir,
+
+		renderActive: false,
+
+		currentFrame: 0,
+		frameElapsed: rollingAverage{sampleSize: 10},
+	}
+
+	r.target = newRenderTarget(config.ImageWidth, config.ImageHeight)
+
+	return &r
+}
+
+func (r *render) startFrame() {
+	scene := r.scene(
+		uint32(r.currentFrame),
+		float64(r.currentFrame)*(1.0/float64(r.config.FrameSpeed)),
+	)
+
+	r.lastFrameStart = time.Now()
+	r.core.WaitForReady() // This should return immediately
+	r.target.Reset(r.core.StartRender(scene))
+}
+
+func (r *render) startExport() {
+	if r.exportCmd != nil {
+		if !r.exportCmd.ProcessState.Exited() {
+			panic("refusing to start exporting when already exporting")
+		}
+	}
+
+	inputImages := path.Join(r.exportPath, "frame-%d.png")
+	outputVideo := path.Clean(path.Join(r.exportPath, "..", path.Base(r.exportPath)+".mp4"))
+
+	r.exportCmd = exec.Command("ffmpeg",
+		"-y",
+		"-framerate", strconv.Itoa(int(r.config.FrameSpeed)),
+		"-i", inputImages,
+		"-pix_fmt", "yuv420p",
+		"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
+		"-vcodec", "h264",
+		"-acodec", "aac",
+		outputVideo,
+	)
+	r.exportCmd.Stderr = os.Stderr
+	r.exportCmd.Stdout = os.Stdout
+
+	if err := r.exportCmd.Start(); err != nil {
+		panic(err)
+	}
+}
+
+func (r *render) Think() (AppPhaseId, error) {
+	if !r.renderActive {
+		r.currentFrame += 1
+		if r.currentFrame > r.config.FrameCount {
+			r.startExport()
+			return Idle, nil
+		}
+
+		r.startFrame()
+		r.renderActive = true
+	}
+
+	r.target.RenderBuffer()
+	if r.target.done {
+		r.frameElapsed.Sample(time.Since(r.lastFrameStart))
+		r.target.Export(r.exportPath, r.currentFrame)
+		r.renderActive = false
+	}
+
+	return Render, nil
+}
+
+func (r *render) Draw() {
+	rl.DrawTextureV(r.target.Texture, rl.Vector2Zero(), rl.White)
+
+	DrawInfo(0, "frame", fmt.Sprintf("%d/%d", r.currentFrame, r.config.FrameCount))
+	if r.frameElapsed.HasSamples() {
+		averageFrameTime := r.frameElapsed.Average()
+		DrawInfo(1, "avg_frame_time", averageFrameTime.Round(time.Millisecond).String())
+		DrawInfo(2, "done_in", (time.Duration(r.config.FrameCount-r.currentFrame) * averageFrameTime).Round(time.Millisecond).String())
+	}
+}
+
+func (r *render) Complete() error {
+	if r.exportCmd != nil {
+		return r.exportCmd.Wait()
+	}
+
+	return nil
 }
