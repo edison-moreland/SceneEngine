@@ -249,7 +249,10 @@ func (r *render) Think() (AppPhaseId, error) {
 
 		r.currentFrame += 1
 		if r.currentFrame > r.config.FrameCount {
-			r.startExport()
+			if r.config.FrameSpeed > 0 {
+				r.startExport()
+			}
+
 			r.currentFrame = 0
 			r.frameElapsed.Reset()
 			return Idle, nil
