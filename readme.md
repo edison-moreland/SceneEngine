@@ -52,7 +52,7 @@ export {
 
 Which outputs:
 
-[Final render of "Ray Tracing in One Weekend"](./images/rtow.png)
+![Final render of "Ray Tracing in One Weekend"](./images/rtow.png)
 
 # Development
 
