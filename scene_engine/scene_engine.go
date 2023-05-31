@@ -15,7 +15,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/edison-moreland/SceneEngine/scene_engine/core"
-	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
 	"github.com/edison-moreland/SceneEngine/scene_engine/script"
 )
 
@@ -47,7 +46,9 @@ func main() {
 	logger.Info("Welcome to SceneEngine!")
 
 	logger.Info("Loading scene script")
-	config, scene, err := script.LoadSceneScript(engineCtx, scriptPath)
+	var sceneCache script.SceneCache
+
+	err := script.LoadSceneScript(&sceneCache, scriptPath)
 	if err != nil {
 		logger.Fatal("Could not load script!", zap.Error(err))
 	}
@@ -58,9 +59,8 @@ func main() {
 		logger.Fatal("Could not start core!", zap.Error(err))
 	}
 	logger.Info("Render core ready!", zap.String("version", renderCore.Info()))
-	renderCore.SetConfig(config)
 
-	rl.InitWindow(int32(config.ImageWidth), int32(config.ImageHeight), "SceneEngine")
+	rl.InitWindow(int32(sceneCache.Config().ImageWidth), int32(sceneCache.Config().ImageHeight), "SceneEngine")
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
 
@@ -68,12 +68,10 @@ func main() {
 	// - LoadScript <- starting phase
 	//   - populates scene cache
 	// 	 - fancy loading bar
-	// - EncodeVideo
-	//   - another fancy loading bar
-	//   - fix `<defunct>` pids left behind by encode
 	err = RunPhases(logger, Idle, map[AppPhaseId]AppPhase{
 		Idle:   IdlePhase(),
-		Render: RenderPhase(renderCore, scene, config, exportDir(scriptPath)),
+		Render: RenderPhase(renderCore, &sceneCache, exportDir(scriptPath)),
+		Encode: EncodePhase(&sceneCache, exportDir(scriptPath)),
 	})
 	if err != nil {
 		logger.Fatal("Render machine br0k3", zap.Error(err))
@@ -91,12 +89,32 @@ type AppPhaseId int
 const (
 	Idle AppPhaseId = iota
 	Render
+	Encode
 )
 
 type AppPhase interface {
 	Think() (next AppPhaseId, err error)
 	Draw()
-	Complete() error
+
+	Start() error // Called when transitioning to this phase
+	End() error   // Called when transitioning to a different phase
+
+	Shutdown() error // Ran when app is shutting down
+}
+
+type emptyPhase struct {
+}
+
+func (e *emptyPhase) Start() error {
+	return nil
+}
+
+func (e *emptyPhase) End() error {
+	return nil
+}
+
+func (e *emptyPhase) Shutdown() error {
+	return nil
 }
 
 func RunPhases(logger *zap.Logger, startPhase AppPhaseId, phases map[AppPhaseId]AppPhase) error {
@@ -104,11 +122,15 @@ func RunPhases(logger *zap.Logger, startPhase AppPhaseId, phases map[AppPhaseId]
 
 	defer func() {
 		for _, phase := range phases {
-			if err := phase.Complete(); err != nil {
+			if err := phase.Shutdown(); err != nil {
 				logger.Error("Err completing phase", zap.Error(err))
 			}
 		}
 	}()
+
+	if err := phases[current].Start(); err != nil {
+		return err
+	}
 
 	for !rl.WindowShouldClose() {
 		next, err := phases[current].Think()
@@ -121,7 +143,19 @@ func RunPhases(logger *zap.Logger, startPhase AppPhaseId, phases map[AppPhaseId]
 		phases[current].Draw()
 		rl.EndDrawing()
 
+		if next != current {
+			if err := phases[current].End(); err != nil {
+				return err
+			}
+			if err := phases[next].Start(); err != nil {
+				return err
+			}
+		}
 		current = next
+	}
+
+	if err := phases[current].End(); err != nil {
+		return err
 	}
 
 	return nil
@@ -130,6 +164,7 @@ func RunPhases(logger *zap.Logger, startPhase AppPhaseId, phases map[AppPhaseId]
 /* Idle Phase */
 
 type idle struct {
+	emptyPhase
 	renderButton Button
 }
 
@@ -151,20 +186,15 @@ func (i *idle) Draw() {
 	i.renderButton.Draw()
 }
 
-func (i *idle) Complete() error {
-	return nil
-}
-
-/* Render phase */
+/* Render Phase */
 
 type render struct {
+	emptyPhase
+
 	core       *core.RenderCore
 	target     *renderTarget
-	scene      script.GenerateScene
-	config     messages.Config
+	sceneCache *script.SceneCache
 	exportPath string
-
-	exportCmd *exec.Cmd
 
 	renderActive bool
 
@@ -173,11 +203,10 @@ type render struct {
 	frameElapsed   rollingAverage
 }
 
-func RenderPhase(core *core.RenderCore, scene script.GenerateScene, config messages.Config, exportDir string) AppPhase {
+func RenderPhase(core *core.RenderCore, sceneCache *script.SceneCache, exportDir string) AppPhase {
 	r := render{
 		core:       core,
-		scene:      scene,
-		config:     config,
+		sceneCache: sceneCache,
 		exportPath: exportDir,
 
 		renderActive: false,
@@ -185,8 +214,6 @@ func RenderPhase(core *core.RenderCore, scene script.GenerateScene, config messa
 		currentFrame: 0,
 		frameElapsed: rollingAverage{sampleSize: 10},
 	}
-
-	r.target = newRenderTarget(config.ImageWidth, config.ImageHeight)
 
 	return &r
 }
@@ -200,61 +227,40 @@ func (r *render) prepareExportDir() error {
 }
 
 func (r *render) startFrame() {
-	scene := r.scene(
-		uint32(r.currentFrame),
-		float64(r.currentFrame)*(1.0/float64(r.config.FrameSpeed)),
-	)
+	scene := r.sceneCache.Scene(r.currentFrame)
 
 	r.lastFrameStart = time.Now()
 	r.core.WaitForReady() // This should return immediately
 	r.target.Reset(r.core.StartRender(scene))
 }
 
-func (r *render) startExport() {
-	if r.exportCmd != nil {
-		if r.exportCmd.ProcessState != nil {
-			// TODO: Double check that this check actually works
-			panic("refusing to start exporting when already exporting")
-		}
+func (r *render) Start() error {
+	// Begin the render cycle
+	r.currentFrame = 0
+	r.renderActive = false
+	r.frameElapsed.Reset()
+
+	if err := r.prepareExportDir(); err != nil {
+		return err
 	}
 
-	inputImages := path.Join(r.exportPath, "frame-%d.png")
-	outputVideo := path.Clean(path.Join(r.exportPath, "..", path.Base(r.exportPath)+".mp4"))
+	config := r.sceneCache.Config()
+	//rl.SetWindowSize(int(config.ImageWidth), int(config.ImageHeight))
+	r.target = newRenderTarget(config.ImageWidth, config.ImageHeight)
+	r.core.SetConfig(config)
 
-	r.exportCmd = exec.Command("ffmpeg",
-		"-y",
-		"-framerate", strconv.Itoa(int(r.config.FrameSpeed)),
-		"-i", inputImages,
-		"-pix_fmt", "yuv420p",
-		"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
-		"-vcodec", "h264",
-		"-acodec", "aac",
-		outputVideo,
-	)
-	r.exportCmd.Stderr = os.Stderr
-	r.exportCmd.Stdout = os.Stdout
-
-	if err := r.exportCmd.Start(); err != nil {
-		panic(err)
-	}
+	return nil
 }
 
 func (r *render) Think() (AppPhaseId, error) {
 	if !r.renderActive {
-		if r.currentFrame == 0 {
-			if err := r.prepareExportDir(); err != nil {
-				return Idle, err
-			}
-		}
-
 		r.currentFrame += 1
-		if r.currentFrame > r.config.FrameCount {
-			if r.config.FrameSpeed > 0 {
-				r.startExport()
-			}
 
-			r.currentFrame = 0
-			r.frameElapsed.Reset()
+		config := r.sceneCache.Config()
+		if r.currentFrame > config.FrameCount {
+			if config.FrameSpeed > 0 {
+				return Encode, nil
+			}
 			return Idle, nil
 		}
 
@@ -272,21 +278,102 @@ func (r *render) Think() (AppPhaseId, error) {
 	return Render, nil
 }
 
+func (r *render) End() error {
+	// There should be a pending ready already
+	r.core.WaitForReady()
+	r.target.Close()
+	r.target = nil
+	return nil
+}
+
 func (r *render) Draw() {
 	rl.DrawTextureV(r.target.Texture, rl.Vector2Zero(), rl.White)
 
-	DrawInfo(0, "frame", fmt.Sprintf("%d/%d", r.currentFrame, r.config.FrameCount))
+	config := r.sceneCache.Config()
+	DrawInfo(0, "frame", fmt.Sprintf("%d/%d", r.currentFrame, config.FrameCount))
 	if r.frameElapsed.HasSamples() {
 		averageFrameTime := r.frameElapsed.Average()
 		DrawInfo(1, "avg_frame_time", averageFrameTime.Round(time.Millisecond).String())
-		DrawInfo(2, "done_in", (time.Duration(r.config.FrameCount-r.currentFrame) * averageFrameTime).Round(time.Millisecond).String())
+		DrawInfo(2, "done_in", (time.Duration(config.FrameCount-r.currentFrame) * averageFrameTime).Round(time.Millisecond).String())
 	}
 }
 
-func (r *render) Complete() error {
-	if r.exportCmd != nil {
-		return r.exportCmd.Wait()
+func (r *render) Shutdown() error {
+	return nil
+}
+
+/* Encode Phase */
+
+type encode struct {
+	emptyPhase
+
+	sceneCache *script.SceneCache
+
+	encodeCmd    *exec.Cmd
+	encodeActive bool
+	exportDir    string
+}
+
+func EncodePhase(sceneCache *script.SceneCache, exportDir string) AppPhase {
+	return &encode{
+		sceneCache: sceneCache,
+		exportDir:  exportDir,
+	}
+}
+
+func (e *encode) startEncode() error {
+	inputImages := path.Join(e.exportDir, "frame-%d.png")
+	outputVideo := path.Clean(path.Join(e.exportDir, "..", path.Base(e.exportDir)+".mp4"))
+
+	// These ffmpeg parameters should create an MP4 compatible with quicktime
+	config := e.sceneCache.Config()
+	e.encodeCmd = exec.Command("ffmpeg",
+		"-y",
+		"-framerate", strconv.Itoa(int(config.FrameSpeed)),
+		"-i", inputImages,
+		"-pix_fmt", "yuv420p",
+		"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
+		"-vcodec", "h264",
+		"-acodec", "aac",
+		outputVideo,
+	)
+	e.encodeCmd.Stderr = os.Stderr
+	e.encodeCmd.Stdout = os.Stdout
+
+	err := e.encodeCmd.Start()
+	if err != nil {
+		return err
 	}
 
+	e.encodeActive = true
+	go func() {
+		if err := e.encodeCmd.Wait(); err != nil {
+			panic(err)
+		}
+		e.encodeActive = false
+	}()
+
 	return nil
+}
+
+func (e *encode) Start() error {
+	return e.startEncode()
+}
+
+func (e *encode) Think() (AppPhaseId, error) {
+	if e.encodeActive {
+		return Encode, nil
+	}
+
+	return Idle, nil
+}
+
+func (e *encode) End() error {
+	e.encodeCmd = nil
+
+	return nil
+}
+
+func (e *encode) Draw() {
+	rl.DrawText("Encoding video...", 10, 10, 30, rl.Black)
 }
