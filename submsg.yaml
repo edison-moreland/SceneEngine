@@ -13,6 +13,8 @@ types:
       image_width: Uint
       samples: Uint
       depth: Uint
+      frame_count: Uint
+      frame_speed: Uint
 
   - name: position
     type: struct

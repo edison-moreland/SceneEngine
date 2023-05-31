@@ -224,6 +224,9 @@ func startScript(ctx context.Context, sceneScript string, requests chan sceneReq
 
 func getConfig(o *tengo.Map) (messages.Config, error) {
 	var config messages.Config
+	config.FrameCount = 1
+	config.Depth = 50
+	config.Samples = 50
 
 	for key, val := range o.Value {
 		switch key {
@@ -251,6 +254,18 @@ func getConfig(o *tengo.Map) (messages.Config, error) {
 				return config, fmt.Errorf("%w: got %T for %s", ErrConfigValueIncorrectType, val, key)
 			}
 			config.AspectRatio = aspectRatio
+		case "frame_count":
+			frameCount, ok := tengo.ToInt(val)
+			if !ok {
+				return config, fmt.Errorf("%w: got %T for %s", ErrConfigValueIncorrectType, val, key)
+			}
+			config.FrameCount = uint64(frameCount)
+		case "frame_speed":
+			frameSpeed, ok := tengo.ToInt(val)
+			if !ok {
+				return config, fmt.Errorf("%w: got %T for %s", ErrConfigValueIncorrectType, val, key)
+			}
+			config.FrameSpeed = uint64(frameSpeed)
 		default:
 			return config, fmt.Errorf("%w: %s", ErrUnknownConfigValue, key)
 		}

@@ -7,19 +7,21 @@ m := import("material")
 export {
     config: {
         aspect_ratio: (3.0 / 2.0),
-        image_width: 200,
-        samples: 50,
-        depth: 50
+        image_width: 400,
+        samples: 100,
+        depth: 50,
+        frame_count: (60 * 5),
+        frame_speed: 60
     },
 
     scene: func(se, frame, seconds) {
         se.Object(
-            s.Sphere(vec3.New(math.sin(seconds) , 1, math.cos(seconds)), 1),
+            s.Sphere(vec3.New(math.sin(seconds), 1, math.cos(seconds)), 1),
             m.Lambert(color.New(102, 51, 25))
         )
 
         se.Object(
-            s.Sphere(vec3.New(-math.sin(seconds) , 1, -math.cos(seconds)), 1),
+            s.Sphere(vec3.New(-math.sin(seconds), 1, -math.cos(seconds)), 1),
             m.Metal(color.New(178, 153, 127), 0.0)
         )
 
@@ -31,7 +33,7 @@ export {
 
         se.Camera(
             vec3.New(13, 2, 3),
-            vec3.New(0, 0, 0),
+            vec3.New(0, 1, 0),
             20
         )
     }

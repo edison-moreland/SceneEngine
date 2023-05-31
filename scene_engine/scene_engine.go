@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"strings"
@@ -76,13 +77,11 @@ func main() {
 	rl.SetTargetFPS(60)
 
 	currentFrame := uint64(1)
-	frameCount := uint64(30)
-	frameSpeed := float64(30)
 
 	startRender := func(frame uint64) <-chan []messages.Pixel {
 		logger.Info("Rendering frame", zap.Uint64("frame", currentFrame))
 
-		return renderCore.StartRender(requestScene(uint32(frame), float64(frame)*(1.0/frameSpeed)))
+		return renderCore.StartRender(requestScene(uint32(frame), float64(frame)*(1.0/float64(config.FrameSpeed))))
 	}
 
 	target := newRenderTarget(
@@ -106,7 +105,7 @@ drawLoop:
 				target.Export(exportDir, currentFrame)
 
 				currentFrame += 1
-				if currentFrame > frameCount {
+				if currentFrame > config.FrameCount {
 					break drawLoop
 				}
 
@@ -126,6 +125,18 @@ drawLoop:
 		rl.EndDrawing()
 	}
 	logger.Info("Done!")
+
+	if config.FrameSpeed > 0 {
+		logger.Info("Exporting video")
+		cmd, err := ffmpegEncodeVideo(engineCtx, config, exportDir)
+		if err != nil {
+			log.Fatal("Could not start ffmpeg to export video", zap.Error(err))
+		}
+		err = cmd.Wait()
+		if err != nil {
+			log.Fatal("Err exporting video", zap.Error(err))
+		}
+	}
 }
 
 type renderTarget struct {
