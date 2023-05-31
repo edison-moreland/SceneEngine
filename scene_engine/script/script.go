@@ -10,8 +10,8 @@ import (
 	"github.com/d5/tengo/v2"
 	"github.com/d5/tengo/v2/stdlib"
 
-	"github.com/edison-moreland/SceneEngine/src/core/messages"
-	"github.com/edison-moreland/SceneEngine/src/script/libraries"
+	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
+	"github.com/edison-moreland/SceneEngine/scene_engine/script/libraries"
 )
 
 var (
@@ -194,8 +194,6 @@ func startScript(ctx context.Context, sceneScript string, requests chan sceneReq
 							LookAt:   lookAt.Position(),
 							LookFrom: lookFrom.Position(),
 						}
-
-						fmt.Println(scene.Camera)
 
 						return nil, nil
 					}},

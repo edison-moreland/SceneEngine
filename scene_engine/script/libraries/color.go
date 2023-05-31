@@ -6,7 +6,7 @@ import (
 	"github.com/d5/tengo/v2"
 	rl "github.com/gen2brain/raylib-go/raylib"
 
-	"github.com/edison-moreland/SceneEngine/src/core/messages"
+	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
 )
 
 var ColorModule = map[string]tengo.Object{

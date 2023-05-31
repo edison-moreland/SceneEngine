@@ -7,7 +7,7 @@ import (
 
 	"github.com/vmihailenco/msgpack/v5"
 
-	"github.com/edison-moreland/SceneEngine/src/core/messages"
+	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
 	"github.com/edison-moreland/SceneEngine/submsg/runtime/go"
 )
 
@@ -60,6 +60,7 @@ func (r *RenderCore) CoreReady(_ []byte) error {
 	// We should introduce explicit "phases", eg: "starting", "ready", "rendering"
 	if r.pixelsOut != nil {
 		close(r.pixelsOut)
+		r.pixelsOut = nil
 	}
 
 	r.ready <- true
@@ -120,9 +121,10 @@ func (r *RenderCore) SetConfig(c messages.Config) {
 
 // StartRender will start rendering the next frame
 func (r *RenderCore) StartRender(scene messages.Scene) <-chan []messages.Pixel {
-	if r.pixelsOut == nil {
-		r.pixelsOut = make(chan []messages.Pixel)
+	if r.pixelsOut != nil {
+		panic("Can't start rendering while already rendering")
 	}
+	r.pixelsOut = make(chan []messages.Pixel)
 
 	body, err := msgpack.Marshal(scene)
 	if err != nil {

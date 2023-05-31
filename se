@@ -9,13 +9,13 @@ function compile_render_core() {
 }
 
 function compile_scene_engine() {
-  go build -o "${project_root}"/build/bin/scene_engine "${project_root}"/src/*.go
+  go build -o "${project_root}"/build/bin/scene_engine "${project_root}"/scene_engine/*.go
 }
 
 function generate_submsg_libraries() {
   go run "${project_root}"/submsg/codegen/*.go \
     --descriptor "${project_root}"/submsg.yaml \
-    --go-output "${project_root}"/src/core/messages/messages.go \
+    --go-output "${project_root}"/scene_engine/core/messages/messages.go \
     --go-package "messages" \
     --pony-output "${project_root}"/render_core/messages/messages.pony
 }
