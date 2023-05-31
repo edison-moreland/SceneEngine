@@ -19,13 +19,6 @@ import (
 	"github.com/edison-moreland/SceneEngine/scene_engine/script"
 )
 
-//type EnginePhase int
-//
-//const (
-//	Idle EnginePhase = iota
-//	Rendering
-//)
-
 var (
 	corePath   string
 	scriptPath string
@@ -59,11 +52,6 @@ func main() {
 		logger.Fatal("Could not load script!", zap.Error(err))
 	}
 
-	exportDir, err := prepareFS(scriptPath)
-	if err != nil {
-		logger.Fatal("Could not prepare export dir!", zap.Error(err))
-	}
-
 	logger.Info("Starting render core")
 	renderCore, err := core.Start(engineCtx, corePath)
 	if err != nil {
@@ -76,57 +64,35 @@ func main() {
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
 
+	// TODO:
+	// - LoadScript <- starting phase
+	//   - populates scene cache
+	// 	 - fancy loading bar
+	// - EncodeVideo
+	//   - another fancy loading bar
+	//   - fix `<defunct>` pids left behind by encode
 	err = RunPhases(logger, Idle, map[AppPhaseId]AppPhase{
 		Idle:   IdlePhase(),
-		Render: RenderPhase(renderCore, scene, config, exportDir),
+		Render: RenderPhase(renderCore, scene, config, exportDir(scriptPath)),
 	})
 	if err != nil {
 		logger.Fatal("Render machine br0k3", zap.Error(err))
 	}
 }
 
-// prepareFS will make sure an empty folder exists for output, removing any old files
-func prepareFS(scriptPath string) (string, error) {
-	baseDir, scritName := path.Split(scriptPath)
-	name := strings.SplitN(scritName, ".", 2)[0]
-
-	exportDir := path.Join(baseDir, name)
-
-	if err := os.RemoveAll(exportDir); err != nil {
-		return "", err
-	}
-
-	return exportDir, os.Mkdir(exportDir, os.FileMode(0777))
-}
-
-type rollingAverage struct {
-	samples    []time.Duration
-	sampleSize int
-}
-
-func (r *rollingAverage) HasSamples() bool {
-	return len(r.samples) > 0
-}
-
-func (r *rollingAverage) Sample(t time.Duration) {
-	if len(r.samples) == r.sampleSize {
-		r.samples = r.samples[1:]
-	}
-	r.samples = append(r.samples, t)
-}
-
-func (r *rollingAverage) Average() time.Duration {
-	average := time.Duration(0)
-	count := 0
-	for _, s := range r.samples {
-		average += s
-		count += 1
-	}
-
-	return average / time.Duration(count)
+func exportDir(scriptPath string) string {
+	baseDir, scriptName := path.Split(scriptPath)
+	name := strings.SplitN(scriptName, ".", 2)[0]
+	return path.Join(baseDir, name)
 }
 
 type AppPhaseId int
+
+const (
+	Idle AppPhaseId = iota
+	Render
+)
+
 type AppPhase interface {
 	Think() (next AppPhaseId, err error)
 	Draw()
@@ -161,10 +127,7 @@ func RunPhases(logger *zap.Logger, startPhase AppPhaseId, phases map[AppPhaseId]
 	return nil
 }
 
-const (
-	Idle AppPhaseId = iota
-	Render
-)
+/* Idle Phase */
 
 type idle struct {
 	renderButton Button
@@ -191,6 +154,8 @@ func (i *idle) Draw() {
 func (i *idle) Complete() error {
 	return nil
 }
+
+/* Render phase */
 
 type render struct {
 	core       *core.RenderCore
@@ -226,6 +191,14 @@ func RenderPhase(core *core.RenderCore, scene script.GenerateScene, config messa
 	return &r
 }
 
+func (r *render) prepareExportDir() error {
+	if err := os.RemoveAll(r.exportPath); err != nil {
+		return err
+	}
+
+	return os.Mkdir(r.exportPath, os.FileMode(0777))
+}
+
 func (r *render) startFrame() {
 	scene := r.scene(
 		uint32(r.currentFrame),
@@ -239,7 +212,8 @@ func (r *render) startFrame() {
 
 func (r *render) startExport() {
 	if r.exportCmd != nil {
-		if !r.exportCmd.ProcessState.Exited() {
+		if r.exportCmd.ProcessState != nil {
+			// TODO: Double check that this check actually works
 			panic("refusing to start exporting when already exporting")
 		}
 	}
@@ -267,9 +241,17 @@ func (r *render) startExport() {
 
 func (r *render) Think() (AppPhaseId, error) {
 	if !r.renderActive {
+		if r.currentFrame == 0 {
+			if err := r.prepareExportDir(); err != nil {
+				return Idle, err
+			}
+		}
+
 		r.currentFrame += 1
 		if r.currentFrame > r.config.FrameCount {
 			r.startExport()
+			r.currentFrame = 0
+			r.frameElapsed.Reset()
 			return Idle, nil
 		}
 
@@ -277,7 +259,7 @@ func (r *render) Think() (AppPhaseId, error) {
 		r.renderActive = true
 	}
 
-	r.target.RenderBuffer()
+	r.target.RenderBufferToTexture()
 	if r.target.done {
 		r.frameElapsed.Sample(time.Since(r.lastFrameStart))
 		r.target.Export(r.exportPath, r.currentFrame)

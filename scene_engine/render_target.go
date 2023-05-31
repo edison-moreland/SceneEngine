@@ -26,8 +26,8 @@ func newRenderTarget(width uint64, height uint64) *renderTarget {
 	return &r
 }
 
-// RenderBuffer is called in the main thread to render buffered pixels to the texture
-func (r *renderTarget) RenderBuffer() {
+// RenderBufferToTexture is called in the main thread to render buffered pixels to the texture
+func (r *renderTarget) RenderBufferToTexture() {
 	r.Lock()
 	defer r.Unlock()
 

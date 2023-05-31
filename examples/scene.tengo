@@ -10,7 +10,7 @@ export {
         image_width: 400,
         samples: 100,
         depth: 50,
-        frame_count: (30 * 5),
+        frame_count: (30 * 1),
         frame_speed: 30
     },
 
