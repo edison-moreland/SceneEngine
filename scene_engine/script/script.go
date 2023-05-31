@@ -32,6 +32,8 @@ type sceneRequest struct {
 }
 
 func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
+	// TODO: Rebuild this
+
 	request := make(chan sceneRequest)
 	defer close(request)
 
@@ -220,11 +222,16 @@ func startScript(ctx context.Context, sceneScript string, requests chan sceneReq
 	runtime := tengo.NewScript(runtimeSource)
 	runtime.SetImports(moduleMap)
 
+	compiled, err := runtime.Compile()
+	if err != nil {
+		return config, nil
+	}
+
 	go func() {
-		_, err := runtime.RunContext(ctx)
+		err := compiled.RunContext(ctx)
 		if err != nil {
 			if !errors.Is(err, context.Canceled) {
-				panic(err)
+				fmt.Println(err)
 			}
 		}
 	}()

@@ -5,8 +5,9 @@ import (
 )
 
 type SceneCache struct {
-	config messages.Config
-	scenes []messages.Scene
+	config     messages.Config
+	scenes     []messages.Scene
+	sceneCount uint64
 }
 
 func (s *SceneCache) Reset(config messages.Config) {
@@ -14,10 +15,12 @@ func (s *SceneCache) Reset(config messages.Config) {
 	s.scenes = make([]messages.Scene, 0, config.FrameCount)
 	s.scenes = s.scenes[:config.FrameCount]
 	s.config = config
+	s.sceneCount = 0
 }
 
 func (s *SceneCache) CacheScene(frame uint64, scene messages.Scene) {
 	s.scenes[frame-1] = scene
+	s.sceneCount += 1
 }
 
 func (s *SceneCache) Scene(frame uint64) messages.Scene {
@@ -26,4 +29,8 @@ func (s *SceneCache) Scene(frame uint64) messages.Scene {
 
 func (s *SceneCache) Config() messages.Config {
 	return s.config
+}
+
+func (s *SceneCache) Full() bool {
+	return s.sceneCount == s.config.FrameCount
 }

@@ -7,7 +7,7 @@ m := import("material")
 export {
     config: {
         aspect_ratio: (3.0 / 2.0),
-        image_width: 400,
+        image_width: 1200,
         samples: 100,
         depth: 50,
         frame_count: (30 * 1),

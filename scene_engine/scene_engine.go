@@ -45,12 +45,9 @@ func main() {
 
 	logger.Info("Welcome to SceneEngine!")
 
-	logger.Info("Loading scene script")
-	var sceneCache script.SceneCache
-
-	err := script.LoadSceneScript(&sceneCache, scriptPath)
+	scriptFileWatcher, err := WatchFile(scriptPath)
 	if err != nil {
-		logger.Fatal("Could not load script!", zap.Error(err))
+		logger.Fatal("Could not start file watcher!", zap.Error(err))
 	}
 
 	logger.Info("Starting render core")
@@ -60,18 +57,16 @@ func main() {
 	}
 	logger.Info("Render core ready!", zap.String("version", renderCore.Info()))
 
-	rl.InitWindow(int32(sceneCache.Config().ImageWidth), int32(sceneCache.Config().ImageHeight), "SceneEngine")
+	rl.InitWindow(400, 400, "SceneEngine")
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
 
-	// TODO:
-	// - LoadScript <- starting phase
-	//   - populates scene cache
-	// 	 - fancy loading bar
-	err = RunPhases(logger, Idle, map[AppPhaseId]AppPhase{
-		Idle:   IdlePhase(),
-		Render: RenderPhase(renderCore, &sceneCache, exportDir(scriptPath)),
-		Encode: EncodePhase(&sceneCache, exportDir(scriptPath)),
+	var sceneCache script.SceneCache
+	err = RunPhases(logger, LoadScript, map[AppPhaseId]AppPhase{
+		Idle:       IdlePhase(scriptFileWatcher),
+		LoadScript: LoadScriptPhase(&sceneCache, scriptPath),
+		Render:     RenderPhase(renderCore, &sceneCache, exportDir(scriptPath)),
+		Encode:     EncodePhase(&sceneCache, exportDir(scriptPath)),
 	})
 	if err != nil {
 		logger.Fatal("Render machine br0k3", zap.Error(err))
@@ -88,6 +83,7 @@ type AppPhaseId int
 
 const (
 	Idle AppPhaseId = iota
+	LoadScript
 	Render
 	Encode
 )
@@ -165,11 +161,13 @@ func RunPhases(logger *zap.Logger, startPhase AppPhaseId, phases map[AppPhaseId]
 
 type idle struct {
 	emptyPhase
+	script       *FileWatcher
 	renderButton Button
 }
 
-func IdlePhase() AppPhase {
+func IdlePhase(script *FileWatcher) AppPhase {
 	return &idle{
+		script:       script,
 		renderButton: NewButton("Render", rl.Gray, 5, 5),
 	}
 }
@@ -179,7 +177,17 @@ func (i *idle) Think() (AppPhaseId, error) {
 		return Render, nil
 	}
 
+	if i.script.HasChanged() {
+		return LoadScript, nil
+	}
+
 	return Idle, nil
+}
+
+func (i *idle) End() error {
+	i.script.ClearChange()
+
+	return nil
 }
 
 func (i *idle) Draw() {
@@ -245,7 +253,7 @@ func (r *render) Start() error {
 	}
 
 	config := r.sceneCache.Config()
-	//rl.SetWindowSize(int(config.ImageWidth), int(config.ImageHeight))
+	rl.SetWindowSize(int(config.ImageWidth), int(config.ImageHeight))
 	r.target = newRenderTarget(config.ImageWidth, config.ImageHeight)
 	r.core.SetConfig(config)
 
@@ -376,4 +384,47 @@ func (e *encode) End() error {
 
 func (e *encode) Draw() {
 	rl.DrawText("Encoding video...", 10, 10, 30, rl.Black)
+}
+
+/* LoadScript Phase */
+
+type loadScript struct {
+	emptyPhase
+
+	scriptPath string
+	sceneCache *script.SceneCache
+
+	abort bool
+}
+
+func LoadScriptPhase(sceneCache *script.SceneCache, scriptPath string) AppPhase {
+	return &loadScript{
+		scriptPath: scriptPath,
+		sceneCache: sceneCache,
+		abort:      false,
+	}
+}
+
+func (l *loadScript) Start() error {
+	l.abort = false
+
+	err := script.LoadSceneScript(l.sceneCache, l.scriptPath)
+	if err != nil {
+		fmt.Println(err)
+		l.abort = true
+	}
+
+	return nil
+}
+
+func (l *loadScript) Think() (AppPhaseId, error) {
+	if l.sceneCache.Full() || l.abort {
+		return Idle, nil
+	}
+
+	return LoadScript, nil
+}
+
+func (l *loadScript) Draw() {
+	rl.DrawText("Caching scenes...", 10, 10, 30, rl.Black)
 }
