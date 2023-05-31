@@ -1,3 +1,5 @@
+examples/*/
+examples/*.mp4
 build/*
 .idea/*
 _*/*

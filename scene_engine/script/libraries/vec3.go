@@ -7,7 +7,7 @@ import (
 	"github.com/d5/tengo/v2/token"
 	rl "github.com/gen2brain/raylib-go/raylib"
 
-	"github.com/edison-moreland/SceneEngine/src/core/messages"
+	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
 )
 
 var Vec3Module = map[string]tengo.Object{

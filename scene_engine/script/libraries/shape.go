@@ -5,7 +5,7 @@ import (
 
 	"github.com/d5/tengo/v2"
 
-	"github.com/edison-moreland/SceneEngine/src/core/messages"
+	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
 )
 
 var ShapeModule = map[string]tengo.Object{

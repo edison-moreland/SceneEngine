@@ -100,6 +100,8 @@ type MsgCoreInfo struct {
 type Config struct {
 	AspectRatio float64
 	Depth       uint64
+	FrameCount  uint64
+	FrameSpeed  uint64
 	ImageHeight uint64
 	ImageWidth  uint64
 	Samples     uint64

@@ -10,6 +10,12 @@ use "messages"
 use scene = "scene"
 use "../submsg/runtime/pony"
 
+primitive Starting
+primitive Ready
+primitive Rendering
+
+type Phase is (Starting | Ready | Rendering)
+
 actor Main is CoreServer
     let env: Env
     let client: EngineClient
@@ -18,6 +24,8 @@ actor Main is CoreServer
     var rand: Rand = Rand
 
     var render_config: Config = Config.zero()
+
+    var phase: Phase = Starting
 
     new create(env': Env) =>
         env = env'
@@ -28,6 +36,7 @@ actor Main is CoreServer
         let sendMsg = StartSubMsg(env.input, env.out, CoreRouter(this))
         client = EngineClient(sendMsg)
 
+        phase = Ready
         client.core_ready(None)
         logger.log("PonyCore: ready")
 
@@ -35,6 +44,12 @@ actor Main is CoreServer
         client.core_info(Marshal(MsgCoreInfo("PonyCore v0.0.1")))
 
     be config(body: Array[U8] iso) =>
+        match phase
+        | Rendering =>
+            logger.log("PonyCore: refusing to set config while rendering")
+            return
+        end
+
         let r: Reader = Reader
         r.append(consume body)
 
@@ -46,6 +61,13 @@ actor Main is CoreServer
         client.core_ready(None)
 
     be render_frame(body: Array[U8] iso) =>
+        match phase
+        | Rendering =>
+            logger.log("PonyCore: refusing to render frame while rendering another frame")
+            return
+        end
+        phase = Rendering
+
         let r: Reader = Reader
         r.append(consume body)
 
@@ -53,18 +75,22 @@ actor Main is CoreServer
 
         let pixel = PixelBatcher(client, render_config.image_width.usize())
 
+        logger.log("PonyCore: rendering frame")
+
         Renderer.render(
             SchedulerInfoAuth(env.root),
             render_config,
             frame_scene,
             pixel~apply(),
-            {()(client) =>
-                pixel.send_batch()
-                pixel.sync({() =>
-                    client.core_ready(None)
-                })
+            {()(core: Main = this) =>
+                core.render_complete()
             }
         )
+
+    be render_complete() =>
+        logger.log("PonyCore: done rendering")
+        phase = Ready
+        client.core_ready(None)
 
 actor PixelBatcher
     let client: EngineClient
@@ -90,12 +116,6 @@ actor PixelBatcher
         ))
 
         if buffer.size() >= batch_size then
-            send_batch()
+            client.pixel_batch(Marshal(buffer))
+            buffer.clear()
         end
-
-    be send_batch() =>
-        client.pixel_batch(Marshal(buffer))
-        buffer.clear()
-
-    be sync(f: {()} val) =>
-        f()

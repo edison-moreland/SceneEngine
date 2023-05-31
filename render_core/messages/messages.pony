@@ -5,42 +5,6 @@ use "debug"
 use "collections" 
 use "../../submsg/runtime/pony" 
 
-primitive Engine
-    fun core_ready(): MsgId => 0
-    fun core_info(): MsgId => 1
-    fun pixel_batch(): MsgId => 2
-
-interface tag EngineServer
-    fun tag core_ready(body: Array[U8] iso)
-    fun tag core_info(body: Array[U8] iso)
-    fun tag pixel_batch(body: Array[U8] iso)
-
-primitive EngineRouter
-    fun apply(s: EngineServer): ReceiveMsg =>
-        {(id: MsgId, body: Array[U8] iso) =>
-            match id
-            | Engine.core_ready() => s.core_ready(consume body)
-            | Engine.core_info() => s.core_info(consume body)
-            | Engine.pixel_batch() => s.pixel_batch(consume body)
-            end
-        }
-
-actor EngineClient
-    let send_msg: SendMsg
-
-    new create(send_msg': SendMsg) =>
-        send_msg = send_msg'
-
-    be core_ready(data: (Array[U8 val] iso | None)) =>
-        send_msg(Engine.core_ready(), consume data)
-
-    be core_info(data: (Array[U8 val] iso | None)) =>
-        send_msg(Engine.core_info(), consume data)
-
-    be pixel_batch(data: (Array[U8 val] iso | None)) =>
-        send_msg(Engine.pixel_batch(), consume data)
-
-
 primitive Core
     fun info(): MsgId => 0
     fun config(): MsgId => 1
@@ -75,6 +39,42 @@ actor CoreClient
 
     be render_frame(data: (Array[U8 val] iso | None)) =>
         send_msg(Core.render_frame(), consume data)
+
+
+primitive Engine
+    fun core_ready(): MsgId => 0
+    fun core_info(): MsgId => 1
+    fun pixel_batch(): MsgId => 2
+
+interface tag EngineServer
+    fun tag core_ready(body: Array[U8] iso)
+    fun tag core_info(body: Array[U8] iso)
+    fun tag pixel_batch(body: Array[U8] iso)
+
+primitive EngineRouter
+    fun apply(s: EngineServer): ReceiveMsg =>
+        {(id: MsgId, body: Array[U8] iso) =>
+            match id
+            | Engine.core_ready() => s.core_ready(consume body)
+            | Engine.core_info() => s.core_info(consume body)
+            | Engine.pixel_batch() => s.pixel_batch(consume body)
+            end
+        }
+
+actor EngineClient
+    let send_msg: SendMsg
+
+    new create(send_msg': SendMsg) =>
+        send_msg = send_msg'
+
+    be core_ready(data: (Array[U8 val] iso | None)) =>
+        send_msg(Engine.core_ready(), consume data)
+
+    be core_info(data: (Array[U8 val] iso | None)) =>
+        send_msg(Engine.core_info(), consume data)
+
+    be pixel_batch(data: (Array[U8 val] iso | None)) =>
+        send_msg(Engine.pixel_batch(), consume data)
 
 
 class val MsgCoreInfo is MsgPackMarshalable
@@ -122,6 +122,8 @@ primitive UnmarshalMsgPackMsgCoreInfo
 class val Config is MsgPackMarshalable
     var aspect_ratio: F64
     var depth: U64
+    var frame_count: U64
+    var frame_speed: U64
     var image_height: U64
     var image_width: U64
     var samples: U64
@@ -129,12 +131,16 @@ class val Config is MsgPackMarshalable
     new val create(
         aspect_ratio': F64,
         depth': U64,
+        frame_count': U64,
+        frame_speed': U64,
         image_height': U64,
         image_width': U64,
         samples': U64
         ) =>
         aspect_ratio = aspect_ratio'
         depth = depth'
+        frame_count = frame_count'
+        frame_speed = frame_speed'
         image_height = image_height'
         image_width = image_width'
         samples = samples'
@@ -142,16 +148,22 @@ class val Config is MsgPackMarshalable
     new val zero() =>
         aspect_ratio = 0.0
         depth = 0
+        frame_count = 0
+        frame_speed = 0
         image_height = 0
         image_width = 0
         samples = 0
 
     fun marshal_msgpack(w: Writer ref)? =>
-        MessagePackEncoder.fixmap(w, 5)?
+        MessagePackEncoder.fixmap(w, 7)?
         MessagePackEncoder.fixstr(w, "AspectRatio")?
         MessagePackEncoder.float_64(w, aspect_ratio)
         MessagePackEncoder.fixstr(w, "Depth")?
         MessagePackEncoder.uint_64(w, depth)
+        MessagePackEncoder.fixstr(w, "FrameCount")?
+        MessagePackEncoder.uint_64(w, frame_count)
+        MessagePackEncoder.fixstr(w, "FrameSpeed")?
+        MessagePackEncoder.uint_64(w, frame_speed)
         MessagePackEncoder.fixstr(w, "ImageHeight")?
         MessagePackEncoder.uint_64(w, image_height)
         MessagePackEncoder.fixstr(w, "ImageWidth")?
@@ -163,6 +175,8 @@ primitive UnmarshalMsgPackConfig
     fun apply(r: Reader ref): Config =>
         var aspect_ratio': F64 = 0.0
         var depth': U64 = 0
+        var frame_count': U64 = 0
+        var frame_speed': U64 = 0
         var image_height': U64 = 0
         var image_width': U64 = 0
         var samples': U64 = 0
@@ -176,6 +190,10 @@ primitive UnmarshalMsgPackConfig
                     aspect_ratio' = MessagePackDecoder.f64(r)?
                 | "Depth" =>
                     depth' = MessagePackDecoder.u64(r)?
+                | "FrameCount" =>
+                    frame_count' = MessagePackDecoder.u64(r)?
+                | "FrameSpeed" =>
+                    frame_speed' = MessagePackDecoder.u64(r)?
                 | "ImageHeight" =>
                     image_height' = MessagePackDecoder.u64(r)?
                 | "ImageWidth" =>
@@ -197,6 +215,8 @@ primitive UnmarshalMsgPackConfig
         Config(
         aspect_ratio',
         depth',
+        frame_count',
+        frame_speed',
         image_height',
         image_width',
         samples'

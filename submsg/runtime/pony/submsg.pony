@@ -1,6 +1,7 @@
 use "collections"
 use "debug"
 use "buffered"
+use "format"
 
 type MsgId is U32
 type SendMsg is {(MsgId, (Array[U8 val] iso | None))} val
