@@ -46,10 +46,9 @@ func main() {
 
 	logger.Info("Welcome to SceneEngine!")
 
-	logger.Info("Loading scene script")
-	config, scene, err := script.LoadSceneScript(engineCtx, scriptPath)
+	scriptFileWatcher, err := WatchFile(scriptPath)
 	if err != nil {
-		logger.Fatal("Could not load script!", zap.Error(err))
+		logger.Fatal("Could not start file watcher!", zap.Error(err))
 	}
 
 	logger.Info("Starting render core")
@@ -58,22 +57,17 @@ func main() {
 		logger.Fatal("Could not start core!", zap.Error(err))
 	}
 	logger.Info("Render core ready!", zap.String("version", renderCore.Info()))
-	renderCore.SetConfig(config)
 
-	rl.InitWindow(int32(config.ImageWidth), int32(config.ImageHeight), "SceneEngine")
+	rl.InitWindow(400, 400, "SceneEngine")
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
 
-	// TODO:
-	// - LoadScript <- starting phase
-	//   - populates scene cache
-	// 	 - fancy loading bar
-	// - EncodeVideo
-	//   - another fancy loading bar
-	//   - fix `<defunct>` pids left behind by encode
-	err = RunPhases(logger, Idle, map[AppPhaseId]AppPhase{
-		Idle:   IdlePhase(),
-		Render: RenderPhase(renderCore, scene, config, exportDir(scriptPath)),
+	var sceneCache script.SceneCache
+	err = RunPhases(logger, LoadScript, map[AppPhaseId]AppPhase{
+		Preview:    PreviewPhase(scriptFileWatcher, &sceneCache),
+		LoadScript: LoadScriptPhase(&sceneCache, scriptPath),
+		Render:     RenderPhase(renderCore, &sceneCache, exportDir(scriptPath)),
+		Encode:     EncodePhase(&sceneCache, exportDir(scriptPath)),
 	})
 	if err != nil {
 		logger.Fatal("Render machine br0k3", zap.Error(err))
@@ -89,14 +83,35 @@ func exportDir(scriptPath string) string {
 type AppPhaseId int
 
 const (
-	Idle AppPhaseId = iota
+	Preview AppPhaseId = iota
+	LoadScript
 	Render
+	Encode
 )
 
 type AppPhase interface {
 	Think() (next AppPhaseId, err error)
 	Draw()
-	Complete() error
+
+	Start() error // Called when transitioning to this phase
+	End() error   // Called when transitioning to a different phase
+
+	Shutdown() error
+}
+
+type emptyPhase struct {
+}
+
+func (e *emptyPhase) Start() error {
+	return nil
+}
+
+func (e *emptyPhase) End() error {
+	return nil
+}
+
+func (e *emptyPhase) Shutdown() error {
+	return nil
 }
 
 func RunPhases(logger *zap.Logger, startPhase AppPhaseId, phases map[AppPhaseId]AppPhase) error {
@@ -104,11 +119,15 @@ func RunPhases(logger *zap.Logger, startPhase AppPhaseId, phases map[AppPhaseId]
 
 	defer func() {
 		for _, phase := range phases {
-			if err := phase.Complete(); err != nil {
+			if err := phase.Shutdown(); err != nil {
 				logger.Error("Err completing phase", zap.Error(err))
 			}
 		}
 	}()
+
+	if err := phases[current].Start(); err != nil {
+		return err
+	}
 
 	for !rl.WindowShouldClose() {
 		next, err := phases[current].Think()
@@ -121,50 +140,144 @@ func RunPhases(logger *zap.Logger, startPhase AppPhaseId, phases map[AppPhaseId]
 		phases[current].Draw()
 		rl.EndDrawing()
 
+		if next != current {
+			if err := phases[current].End(); err != nil {
+				return err
+			}
+			if err := phases[next].Start(); err != nil {
+				return err
+			}
+		}
 		current = next
 	}
 
+	if err := phases[current].End(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-/* Idle Phase */
+/* Preview Phase */
+// TODO: Maybe rename to "preview"?
 
-type idle struct {
-	renderButton Button
+type preview struct {
+	emptyPhase
+	script *FileWatcher
+
+	renderButton   Button
+	timelineSlider Slider
+
+	sceneCache   *script.SceneCache
+	currentScene uint64
 }
 
-func IdlePhase() AppPhase {
-	return &idle{
+func PreviewPhase(script *FileWatcher, sceneCache *script.SceneCache) AppPhase {
+	return &preview{
+		script: script,
+
 		renderButton: NewButton("Render", rl.Gray, 5, 5),
+
+		sceneCache:   sceneCache,
+		currentScene: 0,
 	}
 }
 
-func (i *idle) Think() (AppPhaseId, error) {
-	if i.renderButton.Down() {
+func (p *preview) colorToColor(c messages.Color) rl.Color {
+	return rl.NewColor(c.R, c.G, c.B, 255)
+}
+
+func (p *preview) positionToVec3(pos messages.Position) rl.Vector3 {
+	return rl.NewVector3(float32(pos.X), float32(pos.Y), float32(pos.Z))
+}
+
+func (p *preview) drawScenePreview() {
+	scene := p.sceneCache.Scene(p.currentScene)
+
+	camera := scene.Camera
+	rl.BeginMode3D(rl.Camera3D{
+		Position: p.positionToVec3(camera.LookFrom),
+		Target:   p.positionToVec3(camera.LookAt),
+		Up:       rl.NewVector3(0, 1, 0),
+		Fovy:     float32(camera.Fov),
+	})
+
+	for _, object := range scene.Objects {
+		objectColor := rl.Gray
+		switch m := object.Material.OneOf.(type) {
+		case messages.Lambert:
+			objectColor = p.colorToColor(m.Albedo)
+		case messages.Metal:
+			objectColor = p.colorToColor(m.Albedo)
+
+			// Dielectric gets default color
+		}
+
+		switch s := object.Shape.OneOf.(type) {
+		case messages.Sphere:
+			rl.DrawSphere(p.positionToVec3(s.Origin), float32(s.Radius), objectColor)
+		}
+	}
+
+	rl.EndMode3D()
+}
+
+func (p *preview) Start() error {
+	config := p.sceneCache.Config()
+	rl.SetTargetFPS(int32(config.FrameSpeed))
+
+	margin := float32(10)
+	timelineHeight := float32(40)
+	p.timelineSlider = NewSlider(
+		margin, float32(config.ImageHeight)-(margin+timelineHeight),
+		float32(config.ImageWidth)-(margin*2), timelineHeight,
+		1, float64(config.FrameCount),
+	)
+
+	return nil
+}
+
+func (p *preview) Think() (AppPhaseId, error) {
+	if p.renderButton.Down() {
 		return Render, nil
 	}
 
-	return Idle, nil
+	if p.script.HasChanged() {
+		return LoadScript, nil
+	}
+
+	config := p.sceneCache.Config()
+	p.currentScene += 1
+	if p.currentScene > config.FrameCount {
+		p.currentScene = 1
+	}
+
+	return Preview, nil
 }
 
-func (i *idle) Draw() {
-	i.renderButton.Draw()
-}
+func (p *preview) End() error {
+	p.script.ClearChange()
 
-func (i *idle) Complete() error {
+	rl.SetTargetFPS(60)
 	return nil
 }
 
-/* Render phase */
+func (p *preview) Draw() {
+	p.drawScenePreview()
+
+	p.renderButton.Draw()
+	p.timelineSlider.Draw()
+}
+
+/* Render Phase */
 
 type render struct {
+	emptyPhase
+
 	core       *core.RenderCore
 	target     *renderTarget
-	scene      script.GenerateScene
-	config     messages.Config
+	sceneCache *script.SceneCache
 	exportPath string
-
-	exportCmd *exec.Cmd
 
 	renderActive bool
 
@@ -173,11 +286,10 @@ type render struct {
 	frameElapsed   rollingAverage
 }
 
-func RenderPhase(core *core.RenderCore, scene script.GenerateScene, config messages.Config, exportDir string) AppPhase {
+func RenderPhase(core *core.RenderCore, sceneCache *script.SceneCache, exportDir string) AppPhase {
 	r := render{
 		core:       core,
-		scene:      scene,
-		config:     config,
+		sceneCache: sceneCache,
 		exportPath: exportDir,
 
 		renderActive: false,
@@ -185,8 +297,6 @@ func RenderPhase(core *core.RenderCore, scene script.GenerateScene, config messa
 		currentFrame: 0,
 		frameElapsed: rollingAverage{sampleSize: 10},
 	}
-
-	r.target = newRenderTarget(config.ImageWidth, config.ImageHeight)
 
 	return &r
 }
@@ -200,62 +310,40 @@ func (r *render) prepareExportDir() error {
 }
 
 func (r *render) startFrame() {
-	scene := r.scene(
-		uint32(r.currentFrame),
-		float64(r.currentFrame)*(1.0/float64(r.config.FrameSpeed)),
-	)
+	scene := r.sceneCache.Scene(r.currentFrame)
 
 	r.lastFrameStart = time.Now()
 	r.core.WaitForReady() // This should return immediately
 	r.target.Reset(r.core.StartRender(scene))
 }
 
-func (r *render) startExport() {
-	if r.exportCmd != nil {
-		if r.exportCmd.ProcessState != nil {
-			// TODO: Double check that this check actually works
-			panic("refusing to start exporting when already exporting")
-		}
+func (r *render) Start() error {
+	// Begin the render cycle
+	r.currentFrame = 0
+	r.renderActive = false
+	r.frameElapsed.Reset()
+
+	if err := r.prepareExportDir(); err != nil {
+		return err
 	}
 
-	inputImages := path.Join(r.exportPath, "frame-%d.png")
-	outputVideo := path.Clean(path.Join(r.exportPath, "..", path.Base(r.exportPath)+".mp4"))
+	config := r.sceneCache.Config()
+	r.target = newRenderTarget(config.ImageWidth, config.ImageHeight)
+	r.core.SetConfig(config)
 
-	r.exportCmd = exec.Command("ffmpeg",
-		"-y",
-		"-framerate", strconv.Itoa(int(r.config.FrameSpeed)),
-		"-i", inputImages,
-		"-pix_fmt", "yuv420p",
-		"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
-		"-vcodec", "h264",
-		"-acodec", "aac",
-		outputVideo,
-	)
-	r.exportCmd.Stderr = os.Stderr
-	r.exportCmd.Stdout = os.Stdout
-
-	if err := r.exportCmd.Start(); err != nil {
-		panic(err)
-	}
+	return nil
 }
 
 func (r *render) Think() (AppPhaseId, error) {
 	if !r.renderActive {
-		if r.currentFrame == 0 {
-			if err := r.prepareExportDir(); err != nil {
-				return Idle, err
-			}
-		}
-
 		r.currentFrame += 1
-		if r.currentFrame > r.config.FrameCount {
-			if r.config.FrameSpeed > 0 {
-				r.startExport()
-			}
 
-			r.currentFrame = 0
-			r.frameElapsed.Reset()
-			return Idle, nil
+		config := r.sceneCache.Config()
+		if r.currentFrame > config.FrameCount {
+			if config.FrameSpeed > 0 {
+				return Encode, nil
+			}
+			return Preview, nil
 		}
 
 		r.startFrame()
@@ -272,21 +360,153 @@ func (r *render) Think() (AppPhaseId, error) {
 	return Render, nil
 }
 
+func (r *render) End() error {
+	// There should be a pending ready already
+	r.core.WaitForReady()
+	r.target.Close()
+	r.target = nil
+	return nil
+}
+
 func (r *render) Draw() {
 	rl.DrawTextureV(r.target.Texture, rl.Vector2Zero(), rl.White)
 
-	DrawInfo(0, "frame", fmt.Sprintf("%d/%d", r.currentFrame, r.config.FrameCount))
+	config := r.sceneCache.Config()
+	DrawInfo(0, "frame", fmt.Sprintf("%d/%d", r.currentFrame, config.FrameCount))
 	if r.frameElapsed.HasSamples() {
 		averageFrameTime := r.frameElapsed.Average()
 		DrawInfo(1, "avg_frame_time", averageFrameTime.Round(time.Millisecond).String())
-		DrawInfo(2, "done_in", (time.Duration(r.config.FrameCount-r.currentFrame) * averageFrameTime).Round(time.Millisecond).String())
+		DrawInfo(2, "done_in", (time.Duration(config.FrameCount-r.currentFrame) * averageFrameTime).Round(time.Millisecond).String())
 	}
 }
 
-func (r *render) Complete() error {
-	if r.exportCmd != nil {
-		return r.exportCmd.Wait()
+func (r *render) Shutdown() error {
+	return nil
+}
+
+/* Encode Phase */
+
+type encode struct {
+	emptyPhase
+
+	sceneCache *script.SceneCache
+
+	encodeCmd    *exec.Cmd
+	encodeActive bool
+	exportDir    string
+}
+
+func EncodePhase(sceneCache *script.SceneCache, exportDir string) AppPhase {
+	return &encode{
+		sceneCache: sceneCache,
+		exportDir:  exportDir,
+	}
+}
+
+func (e *encode) startEncode() error {
+	inputImages := path.Join(e.exportDir, "frame-%d.png")
+	outputVideo := path.Clean(path.Join(e.exportDir, "..", path.Base(e.exportDir)+".mp4"))
+
+	// These ffmpeg parameters should create an MP4 compatible with quicktime
+	config := e.sceneCache.Config()
+	e.encodeCmd = exec.Command("ffmpeg",
+		"-y",
+		"-framerate", strconv.Itoa(int(config.FrameSpeed)),
+		"-i", inputImages,
+		"-pix_fmt", "yuv420p",
+		"-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
+		"-vcodec", "h264",
+		"-acodec", "aac",
+		outputVideo,
+	)
+	e.encodeCmd.Stderr = os.Stderr
+	e.encodeCmd.Stdout = os.Stdout
+
+	err := e.encodeCmd.Start()
+	if err != nil {
+		return err
+	}
+
+	e.encodeActive = true
+	go func() {
+		if err := e.encodeCmd.Wait(); err != nil {
+			panic(err)
+		}
+		e.encodeActive = false
+	}()
+
+	return nil
+}
+
+func (e *encode) Start() error {
+	return e.startEncode()
+}
+
+func (e *encode) Think() (AppPhaseId, error) {
+	if e.encodeActive {
+		return Encode, nil
+	}
+
+	return Preview, nil
+}
+
+func (e *encode) End() error {
+	e.encodeCmd = nil
+
+	return nil
+}
+
+func (e *encode) Draw() {
+	rl.DrawText("Encoding video...", 10, 10, 30, rl.Black)
+}
+
+/* LoadScript Phase */
+
+type loadScript struct {
+	emptyPhase
+
+	scriptPath string
+	sceneCache *script.SceneCache
+
+	abort bool
+}
+
+func LoadScriptPhase(sceneCache *script.SceneCache, scriptPath string) AppPhase {
+	return &loadScript{
+		scriptPath: scriptPath,
+		sceneCache: sceneCache,
+		abort:      false,
+	}
+}
+
+func (l *loadScript) Start() error {
+	l.abort = false
+
+	err := script.LoadSceneScript(l.sceneCache, l.scriptPath)
+	if err != nil {
+		fmt.Println(err)
+		l.abort = true
 	}
 
 	return nil
+}
+
+func (l *loadScript) Think() (AppPhaseId, error) {
+	if l.sceneCache.Full() || l.abort {
+		return Preview, nil
+	}
+
+	return LoadScript, nil
+}
+
+func (l *loadScript) End() error {
+	config := l.sceneCache.Config()
+	rl.SetTargetFPS(int32(config.FrameSpeed))
+	rl.SetWindowSize(int(config.ImageWidth), int(config.ImageHeight))
+
+	return nil
+}
+
+func (l *loadScript) Draw() {
+	rl.DrawText("Caching scenes...", 10, 10, 30, rl.Black)
 }

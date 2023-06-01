@@ -31,16 +31,22 @@ type sceneRequest struct {
 	response chan<- messages.Scene
 }
 
-func LoadSceneScript(ctx context.Context, sceneScript string) (messages.Config, GenerateScene, error) {
+func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
+	// TODO: Rebuild this
+
 	request := make(chan sceneRequest)
+	defer close(request)
 
-	config, err := startScript(ctx, sceneScript, request)
+	scriptCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	config, err := startScript(scriptCtx, sceneScript, request)
 	if err != nil {
-		close(request)
-		return config, nil, err
+		return err
 	}
+	sceneCache.Reset(config)
 
-	return config, func(frame uint32, seconds float64) messages.Scene {
+	requestScene := func(frame uint32, seconds float64) messages.Scene {
 		responseChan := make(chan messages.Scene)
 		defer close(responseChan)
 
@@ -51,7 +57,13 @@ func LoadSceneScript(ctx context.Context, sceneScript string) (messages.Config, 
 		}
 
 		return <-responseChan
-	}, nil
+	}
+
+	for i := uint64(1); i <= config.FrameCount; i++ {
+		sceneCache.CacheScene(i, requestScene(uint32(i), float64(i)*(1.0/float64(config.FrameSpeed))))
+	}
+
+	return nil
 }
 
 func startScript(ctx context.Context, sceneScript string, requests chan sceneRequest) (messages.Config, error) {
@@ -69,6 +81,7 @@ func startScript(ctx context.Context, sceneScript string, requests chan sceneReq
 	moduleMap.AddSourceModule("userscript", source)
 	moduleMap.AddBuiltinModule("fmt", stdlib.BuiltinModules["fmt"])
 	moduleMap.AddBuiltinModule("math", stdlib.BuiltinModules["math"])
+	moduleMap.AddBuiltinModule("rand", stdlib.BuiltinModules["rand"])
 	moduleMap.AddBuiltinModule("vec3", libraries.Vec3Module)
 	moduleMap.AddBuiltinModule("color", libraries.ColorModule)
 	moduleMap.AddBuiltinModule("shape", libraries.ShapeModule)
@@ -210,12 +223,17 @@ func startScript(ctx context.Context, sceneScript string, requests chan sceneReq
 	runtime := tengo.NewScript(runtimeSource)
 	runtime.SetImports(moduleMap)
 
-	go func() {
-		defer close(requests)
+	compiled, err := runtime.Compile()
+	if err != nil {
+		return config, err
+	}
 
-		_, err := runtime.RunContext(ctx)
+	go func() {
+		err := compiled.RunContext(ctx)
 		if err != nil {
-			panic(err)
+			if !errors.Is(err, context.Canceled) {
+				fmt.Println(err)
+			}
 		}
 	}()
 

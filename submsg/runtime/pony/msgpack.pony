@@ -47,29 +47,19 @@ primitive Marshal
 
 primitive Unmarshal
     fun map(b: Reader ref): USize val ? =>
-        try
-            MessagePackDecoder.fixmap(b)?.usize()
+        match b.peek_u8()?
+        | 0xde => MessagePackDecoder.map_16(b)?.usize()
+        | 0xdf => MessagePackDecoder.map_32(b)?.usize()
         else
-            Debug("big map" where stream=DebugErr)
-            try
-                MessagePackDecoder.map_16(b)?.usize()
-            else
-                Debug("bigger map" where stream=DebugErr)
-                MessagePackDecoder.map_32(b)?.usize()
-            end
+            MessagePackDecoder.fixmap(b)?.usize()
         end
 
     fun array_header(b: Reader ref): USize val ? =>
-        try
-            MessagePackDecoder.fixarray(b)?.usize()
+        match b.peek_u8()?
+        | 0xdc => MessagePackDecoder.array_16(b)?.usize()
+        | 0xdd => MessagePackDecoder.array_32(b)?.usize()
         else
-            Debug("big array" where stream=DebugErr)
-            try
-                MessagePackDecoder.array_16(b)?.usize()
-            else
-                Debug("bigger array" where stream=DebugErr)
-                MessagePackDecoder.array_32(b)?.usize()
-            end
+            MessagePackDecoder.fixarray(b)?.usize()
         end
 
     fun array[M: MsgPackMarshalable #send](b: Reader ref, u: {(Reader ref): M^?}): Array[M] iso^ ? =>
