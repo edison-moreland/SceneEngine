@@ -4,16 +4,59 @@ import (
 	"fmt"
 
 	rl "github.com/gen2brain/raylib-go/raylib"
+
+	"github.com/edison-moreland/SceneEngine/scene_engine/layout"
 )
 
-func DrawInfo(row int32, key, value string) {
-	textSize := int32(10)
-	margin := int32(2)
+type TextBlock struct {
+	lines    []string
+	textSize int32
 
-	rl.DrawText(
-		fmt.Sprintf("%s: %s", key, value),
-		margin, margin+(textSize*row), textSize, rl.Black,
-	)
+	p *layout.Rec
+	d layout.Direction
+}
+
+func NewTextBlock(lines []string, textSize int32, p *layout.Rec, d layout.Direction) TextBlock {
+	return TextBlock{lines: lines, textSize: textSize, p: p, d: d}
+}
+
+func (t *TextBlock) Measure() *layout.Rec {
+	bounds := rl.Rectangle{}
+	bounds.Height = float32(len(t.lines) * int(t.textSize))
+
+	for _, line := range t.lines {
+		width := float32(rl.MeasureText(line, t.textSize))
+		if width > bounds.Width {
+			bounds.Width = width
+		}
+	}
+
+	return layout.Layout(bounds)
+}
+
+func (t *TextBlock) Draw() {
+	rec := t.Measure().Layout(t.p, t.d)
+
+	for row, line := range t.lines {
+		rl.DrawText(
+			line,
+			int32(rec.X), int32(rec.Y)+(t.textSize*int32(row)), t.textSize, rl.Black,
+		)
+	}
+}
+
+type StatBlock struct {
+	TextBlock
+}
+
+func NewStatBlock(p *layout.Rec, d layout.Direction) StatBlock {
+	return StatBlock{
+		TextBlock{textSize: 10, p: p, d: d},
+	}
+}
+
+func (s *StatBlock) AddStat(name, value string) {
+	s.lines = append(s.lines, fmt.Sprintf("%s: %s", name, value))
 }
 
 type Button struct {
@@ -26,7 +69,7 @@ type Button struct {
 	textMargin int32
 }
 
-func NewButton(text string, color rl.Color, x, y float32) Button {
+func NewButton(text string, color rl.Color, p *layout.Rec, d layout.Direction) Button {
 	b := Button{
 		text:       text,
 		color:      color,
@@ -37,10 +80,13 @@ func NewButton(text string, color rl.Color, x, y float32) Button {
 	textWidth := rl.MeasureText(text, b.textSize)
 
 	b.rec = rl.NewRectangle(
-		x, y,
+		0, 0,
 		float32(textWidth+(b.textMargin*2)),
 		float32(b.textSize+(b.textMargin*2)),
 	)
+
+	// TODO: Rename some functions?
+	b.rec = layout.Layout(b.rec).Layout(p, d).Rectangle
 
 	return b
 }
@@ -75,29 +121,23 @@ type Slider struct {
 	value              float64
 }
 
-func NewSlider(x, y, width, height float32, min, max float64) Slider {
+func NewSlider(rec *layout.Rec, min, max float64) Slider {
 	s := Slider{
-		backRec:  rl.NewRectangle(x, y, width, height),
+		backRec:  rec.Rectangle,
 		margin:   5,
 		valueMin: min,
 		valueMax: max,
 		value:    min,
 	}
 
-	s.handleRec = rl.NewRectangle(
-		x+s.margin, y+s.margin,
-		5, height-(s.margin*2),
-	)
+	handleWidth := float32(5)
+	s.handleRec = rec.Margin(s.margin).Resize(layout.Horizontal, layout.West, handleWidth).Rectangle
 
-	s.handleStart = rl.NewVector2(
-		s.handleRec.X+(s.handleRec.Width/2),
-		s.handleRec.Y+(s.handleRec.Height/2),
-	)
+	s.handleStart = layout.CenterPoint(s.handleRec)
 
-	s.handleEnd = rl.NewVector2(
-		x+(width-((s.handleStart.X-x)*2)),
-		s.handleStart.Y,
-	)
+	timelineWidth := s.backRec.Width - ((s.handleStart.X - s.backRec.X) * 2)
+	s.handleEnd = s.handleStart
+	s.handleEnd.X += timelineWidth
 
 	return s
 }

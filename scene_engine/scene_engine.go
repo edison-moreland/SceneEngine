@@ -16,6 +16,7 @@ import (
 
 	"github.com/edison-moreland/SceneEngine/scene_engine/core"
 	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
+	"github.com/edison-moreland/SceneEngine/scene_engine/layout"
 	"github.com/edison-moreland/SceneEngine/scene_engine/script"
 )
 
@@ -176,7 +177,7 @@ func PreviewPhase(script *FileWatcher, sceneCache *script.SceneCache) AppPhase {
 	return &preview{
 		script: script,
 
-		renderButton: NewButton("Render", rl.Gray, 5, 5),
+		renderButton: NewButton("Render", rl.Gray, layout.Window().Margin(5), layout.NorthWest),
 
 		sceneCache:   sceneCache,
 		currentScene: 0,
@@ -226,13 +227,12 @@ func (p *preview) Start() error {
 	config := p.sceneCache.Config()
 	rl.SetTargetFPS(int32(config.FrameSpeed))
 
-	margin := float32(10)
-	timelineHeight := float32(40)
-	p.timelineSlider = NewSlider(
-		margin, float32(config.ImageHeight)-(margin+timelineHeight),
-		float32(config.ImageWidth)-(margin*2), timelineHeight,
-		1, float64(config.FrameCount),
-	)
+	sliderRec := layout.
+		Window().
+		Margin(10).
+		Resize(layout.Vertical, layout.South, 40)
+
+	p.timelineSlider = NewSlider(sliderRec, 1, float64(config.FrameCount))
 
 	return nil
 }
@@ -372,12 +372,15 @@ func (r *render) Draw() {
 	rl.DrawTextureV(r.target.Texture, rl.Vector2Zero(), rl.White)
 
 	config := r.sceneCache.Config()
-	DrawInfo(0, "frame", fmt.Sprintf("%d/%d", r.currentFrame, config.FrameCount))
+	statBlock := NewStatBlock(layout.Window().Margin(5), layout.NorthWest)
+	statBlock.AddStat("frame", fmt.Sprintf("%d/%d", r.currentFrame, config.FrameCount))
 	if r.frameElapsed.HasSamples() {
 		averageFrameTime := r.frameElapsed.Average()
-		DrawInfo(1, "avg_frame_time", averageFrameTime.Round(time.Millisecond).String())
-		DrawInfo(2, "done_in", (time.Duration(config.FrameCount-r.currentFrame) * averageFrameTime).Round(time.Millisecond).String())
+		statBlock.AddStat("avg_frame_time", averageFrameTime.Round(time.Millisecond).String())
+		statBlock.AddStat("done_in", (time.Duration(config.FrameCount-r.currentFrame) * averageFrameTime).Round(time.Millisecond).String())
 	}
+
+	statBlock.Draw()
 }
 
 func (r *render) Shutdown() error {
