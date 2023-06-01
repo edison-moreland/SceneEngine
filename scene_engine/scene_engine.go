@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/edison-moreland/SceneEngine/scene_engine/core"
+	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
 	"github.com/edison-moreland/SceneEngine/scene_engine/script"
 )
 
@@ -63,7 +64,7 @@ func main() {
 
 	var sceneCache script.SceneCache
 	err = RunPhases(logger, LoadScript, map[AppPhaseId]AppPhase{
-		Idle:       IdlePhase(scriptFileWatcher),
+		Preview:    PreviewPhase(scriptFileWatcher, &sceneCache),
 		LoadScript: LoadScriptPhase(&sceneCache, scriptPath),
 		Render:     RenderPhase(renderCore, &sceneCache, exportDir(scriptPath)),
 		Encode:     EncodePhase(&sceneCache, exportDir(scriptPath)),
@@ -82,7 +83,7 @@ func exportDir(scriptPath string) string {
 type AppPhaseId int
 
 const (
-	Idle AppPhaseId = iota
+	Preview AppPhaseId = iota
 	LoadScript
 	Render
 	Encode
@@ -95,7 +96,7 @@ type AppPhase interface {
 	Start() error // Called when transitioning to this phase
 	End() error   // Called when transitioning to a different phase
 
-	Shutdown() error // Ran when app is shutting down
+	Shutdown() error
 }
 
 type emptyPhase struct {
@@ -157,41 +158,115 @@ func RunPhases(logger *zap.Logger, startPhase AppPhaseId, phases map[AppPhaseId]
 	return nil
 }
 
-/* Idle Phase */
+/* Preview Phase */
+// TODO: Maybe rename to "preview"?
 
-type idle struct {
+type preview struct {
 	emptyPhase
-	script       *FileWatcher
-	renderButton Button
+	script *FileWatcher
+
+	renderButton   Button
+	timelineSlider Slider
+
+	sceneCache   *script.SceneCache
+	currentScene uint64
 }
 
-func IdlePhase(script *FileWatcher) AppPhase {
-	return &idle{
-		script:       script,
+func PreviewPhase(script *FileWatcher, sceneCache *script.SceneCache) AppPhase {
+	return &preview{
+		script: script,
+
 		renderButton: NewButton("Render", rl.Gray, 5, 5),
+
+		sceneCache:   sceneCache,
+		currentScene: 0,
 	}
 }
 
-func (i *idle) Think() (AppPhaseId, error) {
-	if i.renderButton.Down() {
-		return Render, nil
-	}
-
-	if i.script.HasChanged() {
-		return LoadScript, nil
-	}
-
-	return Idle, nil
+func (p *preview) colorToColor(c messages.Color) rl.Color {
+	return rl.NewColor(c.R, c.G, c.B, 255)
 }
 
-func (i *idle) End() error {
-	i.script.ClearChange()
+func (p *preview) positionToVec3(pos messages.Position) rl.Vector3 {
+	return rl.NewVector3(float32(pos.X), float32(pos.Y), float32(pos.Z))
+}
+
+func (p *preview) drawScenePreview() {
+	scene := p.sceneCache.Scene(p.currentScene)
+
+	camera := scene.Camera
+	rl.BeginMode3D(rl.Camera3D{
+		Position: p.positionToVec3(camera.LookFrom),
+		Target:   p.positionToVec3(camera.LookAt),
+		Up:       rl.NewVector3(0, 1, 0),
+		Fovy:     float32(camera.Fov),
+	})
+
+	for _, object := range scene.Objects {
+		objectColor := rl.Gray
+		switch m := object.Material.OneOf.(type) {
+		case messages.Lambert:
+			objectColor = p.colorToColor(m.Albedo)
+		case messages.Metal:
+			objectColor = p.colorToColor(m.Albedo)
+
+			// Dielectric gets default color
+		}
+
+		switch s := object.Shape.OneOf.(type) {
+		case messages.Sphere:
+			rl.DrawSphere(p.positionToVec3(s.Origin), float32(s.Radius), objectColor)
+		}
+	}
+
+	rl.EndMode3D()
+}
+
+func (p *preview) Start() error {
+	config := p.sceneCache.Config()
+	rl.SetTargetFPS(int32(config.FrameSpeed))
+
+	margin := float32(10)
+	timelineHeight := float32(40)
+	p.timelineSlider = NewSlider(
+		margin, float32(config.ImageHeight)-(margin+timelineHeight),
+		float32(config.ImageWidth)-(margin*2), timelineHeight,
+		1, float64(config.FrameCount),
+	)
 
 	return nil
 }
 
-func (i *idle) Draw() {
-	i.renderButton.Draw()
+func (p *preview) Think() (AppPhaseId, error) {
+	if p.renderButton.Down() {
+		return Render, nil
+	}
+
+	if p.script.HasChanged() {
+		return LoadScript, nil
+	}
+
+	config := p.sceneCache.Config()
+	p.currentScene += 1
+	if p.currentScene > config.FrameCount {
+		p.currentScene = 1
+	}
+
+	return Preview, nil
+}
+
+func (p *preview) End() error {
+	p.script.ClearChange()
+
+	rl.SetTargetFPS(60)
+	return nil
+}
+
+func (p *preview) Draw() {
+	p.drawScenePreview()
+
+	p.renderButton.Draw()
+	p.timelineSlider.Draw()
 }
 
 /* Render Phase */
@@ -253,7 +328,6 @@ func (r *render) Start() error {
 	}
 
 	config := r.sceneCache.Config()
-	rl.SetWindowSize(int(config.ImageWidth), int(config.ImageHeight))
 	r.target = newRenderTarget(config.ImageWidth, config.ImageHeight)
 	r.core.SetConfig(config)
 
@@ -269,7 +343,7 @@ func (r *render) Think() (AppPhaseId, error) {
 			if config.FrameSpeed > 0 {
 				return Encode, nil
 			}
-			return Idle, nil
+			return Preview, nil
 		}
 
 		r.startFrame()
@@ -373,7 +447,7 @@ func (e *encode) Think() (AppPhaseId, error) {
 		return Encode, nil
 	}
 
-	return Idle, nil
+	return Preview, nil
 }
 
 func (e *encode) End() error {
@@ -419,10 +493,18 @@ func (l *loadScript) Start() error {
 
 func (l *loadScript) Think() (AppPhaseId, error) {
 	if l.sceneCache.Full() || l.abort {
-		return Idle, nil
+		return Preview, nil
 	}
 
 	return LoadScript, nil
+}
+
+func (l *loadScript) End() error {
+	config := l.sceneCache.Config()
+	rl.SetTargetFPS(int32(config.FrameSpeed))
+	rl.SetWindowSize(int(config.ImageWidth), int(config.ImageHeight))
+
+	return nil
 }
 
 func (l *loadScript) Draw() {

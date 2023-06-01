@@ -81,6 +81,7 @@ func startScript(ctx context.Context, sceneScript string, requests chan sceneReq
 	moduleMap.AddSourceModule("userscript", source)
 	moduleMap.AddBuiltinModule("fmt", stdlib.BuiltinModules["fmt"])
 	moduleMap.AddBuiltinModule("math", stdlib.BuiltinModules["math"])
+	moduleMap.AddBuiltinModule("rand", stdlib.BuiltinModules["rand"])
 	moduleMap.AddBuiltinModule("vec3", libraries.Vec3Module)
 	moduleMap.AddBuiltinModule("color", libraries.ColorModule)
 	moduleMap.AddBuiltinModule("shape", libraries.ShapeModule)
@@ -224,7 +225,7 @@ func startScript(ctx context.Context, sceneScript string, requests chan sceneReq
 
 	compiled, err := runtime.Compile()
 	if err != nil {
-		return config, nil
+		return config, err
 	}
 
 	go func() {

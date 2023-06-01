@@ -64,3 +64,46 @@ func (b *Button) Down() bool {
 
 	return false
 }
+
+type Slider struct {
+	backRec, handleRec     rl.Rectangle
+	handleStart, handleEnd rl.Vector2
+
+	margin float32
+
+	valueMax, valueMin float64
+	value              float64
+}
+
+func NewSlider(x, y, width, height float32, min, max float64) Slider {
+	s := Slider{
+		backRec:  rl.NewRectangle(x, y, width, height),
+		margin:   5,
+		valueMin: min,
+		valueMax: max,
+		value:    min,
+	}
+
+	s.handleRec = rl.NewRectangle(
+		x+s.margin, y+s.margin,
+		5, height-(s.margin*2),
+	)
+
+	s.handleStart = rl.NewVector2(
+		s.handleRec.X+(s.handleRec.Width/2),
+		s.handleRec.Y+(s.handleRec.Height/2),
+	)
+
+	s.handleEnd = rl.NewVector2(
+		x+(width-((s.handleStart.X-x)*2)),
+		s.handleStart.Y,
+	)
+
+	return s
+}
+
+func (s *Slider) Draw() {
+	rl.DrawRectangleRec(s.backRec, rl.Gray)
+	rl.DrawLineV(s.handleStart, s.handleEnd, rl.DarkGray)
+	rl.DrawRectangleRec(s.handleRec, rl.Red)
+}
