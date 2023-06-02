@@ -32,7 +32,7 @@ type sceneRequest struct {
 }
 
 func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
-	// TODO: Rebuild this
+	// TODO: Improve error reporting
 
 	request := make(chan sceneRequest)
 	defer close(request)
@@ -66,6 +66,12 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 	return nil
 }
 
+func addStdLib(m *tengo.ModuleMap, libNames ...string) {
+	for _, lib := range libNames {
+		m.AddBuiltinModule(lib, stdlib.BuiltinModules[lib])
+	}
+}
+
 func startScript(ctx context.Context, sceneScript string, requests chan sceneRequest) (messages.Config, error) {
 	var config messages.Config
 
@@ -79,13 +85,9 @@ func startScript(ctx context.Context, sceneScript string, requests chan sceneReq
 
 	moduleMap := tengo.NewModuleMap()
 	moduleMap.AddSourceModule("userscript", source)
-	moduleMap.AddBuiltinModule("fmt", stdlib.BuiltinModules["fmt"])
-	moduleMap.AddBuiltinModule("math", stdlib.BuiltinModules["math"])
-	moduleMap.AddBuiltinModule("rand", stdlib.BuiltinModules["rand"])
-	moduleMap.AddBuiltinModule("vec3", libraries.Vec3Module)
-	moduleMap.AddBuiltinModule("color", libraries.ColorModule)
-	moduleMap.AddBuiltinModule("shape", libraries.ShapeModule)
-	moduleMap.AddBuiltinModule("material", libraries.MaterialModule)
+	addStdLib(moduleMap, "fmt", "math", "rand")
+	libraries.AddSceneEngineLibraries(moduleMap)
+
 	moduleMap.AddBuiltinModule("runtime", map[string]tengo.Object{
 		"config": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
 			// Runtime is giving us the config defined by the userscript

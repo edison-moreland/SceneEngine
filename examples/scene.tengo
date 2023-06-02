@@ -6,39 +6,53 @@ rand := import("rand")
 s := import("shape")
 m := import("material")
 
-random_sphere := func(se) {
-    spread := 2
+random_vec := func() {
+   return vec3.New(rand.float(), rand.float(), rand.float())
+}
 
-    se.Object(
-        s.Sphere(vec3.New(
-            (rand.float()*spread)-(spread/2),
-            (rand.float()*spread)-(spread/2),
-            (rand.float()*spread)-(spread/2)
-        ), rand.float()),
-        m.Lambert(color.Random())
-    )
+random_vec_spread := func(spread) {
+   return vec3.New(
+       (rand.float()*spread)-(spread/2),
+       (rand.float()*spread)-(spread/2),
+       (rand.float()*spread)-(spread/2)
+   )
+}
+
+spread := 3
+sphere_count := 50
+spheres := []
+for i := 0; i < sphere_count; i++ {
+    spheres = append(spheres, [
+        random_vec_spread(spread),
+        rand.float(),
+        color.Random()
+    ])
 }
 
 export {
     config: {
         aspect_ratio: 1.0,
-        image_width: 400,
+        image_width: 600,
         samples: 100,
         depth: 50,
-        frame_count: 1
+        frame_count: (30*1),
+        frame_speed: 30
     },
 
     scene: func(se, frame, seconds) {
-        sphere_count := 100
-
         for i := 0; i < sphere_count; i++ {
-            random_sphere(se)
+            spheres[i][0] = spheres[i][0] + random_vec_spread(0.7)
+
+            se.Object(
+                s.Sphere(spheres[i][0], spheres[i][1]),
+                m.Lambert(spheres[i][2])
+            )
         }
 
         se.Camera(
             vec3.New(10, 0, 0),
             vec3.New(0, 0, 0),
-            30
+            90
         )
     }
 }
