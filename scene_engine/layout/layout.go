@@ -133,3 +133,16 @@ func (l *Rec) Layout(p *Rec, d Direction) *Rec {
 
 	return Layout(rec)
 }
+
+func (l *Rec) Translate(d Axis, v float32) *Rec {
+	rec := l.Rectangle
+
+	switch d {
+	case Horizontal:
+		rec.X += v
+	case Vertical:
+		rec.Y += v
+	}
+
+	return Layout(rec)
+}

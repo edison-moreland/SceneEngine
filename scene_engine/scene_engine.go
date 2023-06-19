@@ -232,7 +232,7 @@ func (p *preview) Start() error {
 		Margin(10).
 		Resize(layout.Vertical, layout.South, 40)
 
-	p.timelineSlider = NewSlider(sliderRec, 1, float64(config.FrameCount))
+	p.timelineSlider = NewSlider(sliderRec, 1, float32(config.FrameCount))
 
 	return nil
 }
@@ -251,6 +251,7 @@ func (p *preview) Think() (AppPhaseId, error) {
 	if p.currentScene > config.FrameCount {
 		p.currentScene = 1
 	}
+	p.timelineSlider.Update(float32(p.currentScene))
 
 	return Preview, nil
 }

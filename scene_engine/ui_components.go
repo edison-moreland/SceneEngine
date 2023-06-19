@@ -117,11 +117,12 @@ type Slider struct {
 
 	margin float32
 
-	valueMax, valueMin float64
-	value              float64
+	valueMax, valueMin float32
+	value              float32
+	unit               float32
 }
 
-func NewSlider(rec *layout.Rec, min, max float64) Slider {
+func NewSlider(rec *layout.Rec, min, max float32) Slider {
 	s := Slider{
 		backRec:  rec.Rectangle,
 		margin:   5,
@@ -130,8 +131,7 @@ func NewSlider(rec *layout.Rec, min, max float64) Slider {
 		value:    min,
 	}
 
-	handleWidth := float32(5)
-	s.handleRec = rec.Margin(s.margin).Resize(layout.Horizontal, layout.West, handleWidth).Rectangle
+	s.handleRec = s.calculateHandleRec(0)
 
 	s.handleStart = layout.CenterPoint(s.handleRec)
 
@@ -139,7 +139,22 @@ func NewSlider(rec *layout.Rec, min, max float64) Slider {
 	s.handleEnd = s.handleStart
 	s.handleEnd.X += timelineWidth
 
+	s.unit = timelineWidth / (max - min)
+
 	return s
+}
+
+func (s *Slider) calculateHandleRec(v float32) rl.Rectangle {
+	handleWidth := float32(5)
+	return layout.Layout(s.backRec).
+		Margin(s.margin).
+		Resize(layout.Horizontal, layout.West, handleWidth).
+		Translate(layout.Horizontal, v*s.unit).Rectangle
+}
+
+func (s *Slider) Update(v float32) {
+	s.value = v
+	s.handleRec = s.calculateHandleRec(v)
 }
 
 func (s *Slider) Draw() {
