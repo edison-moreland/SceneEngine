@@ -57,14 +57,14 @@ class Tracer
         to_pixel_color(color/_config.samples.f64())
 
     fun ref trace(r: Ray, depth: U64): Vec3 =>
-        if depth <= 0 then
+        if depth < 1 then
             return Vec3.zero()
         end
 
         match hit_scene(r)
-        | (let rec: HitRecord, let mat: Material) =>
+        | let rec: HitRecord =>
             // Bounce ray again
-            match ScatterMaterial(_rand, r, rec)(mat)
+            match ScatterMaterial(_rand, r, rec)(rec.material)
             | (let attenuation: Vec3, let scattered: Ray) =>
                 attenuation * trace(scattered, depth-1)
             | None =>
@@ -73,49 +73,34 @@ class Tracer
         | None => sky_color(r)
         end
 
-    fun hit_scene(r: Ray): ((HitRecord, Material) | None) =>
-        var hit_record: (HitRecord | None) = None
-        var closest_t = F64.max_value()
-        var material: Material = Lambert(Vec3.zero())
-
-        for o in _scene.objects.values() do
-            match HitShape(r, 0.0001, closest_t)(o.shape)
-            | let rec: HitRecord =>
-                hit_record = rec
-                closest_t = rec.t
-                material = o.material
-            | None => continue
-            end
-        end
-
-        match hit_record
-        | let rec: HitRecord =>
-            (rec, material)
-        | None =>
-            None
-        end
+    fun hit_scene(r: Ray): (HitRecord | None) =>
+        HitShape(r, 0.0001, F64.max_value())(_scene.root_shape)
 
 class val HitRecord
+    let material: Material
     let normal: Vec3
     let front_face: Bool
     let p: Point3
     let t: F64
 
-    new val create(normal': Vec3, p': Point3, t': F64) =>
+    new val create(normal': Vec3, p': Point3, t': F64, material': Material) =>
         normal = normal'
         p = p'
         t = t'
         front_face = false
+        material = material'
 
     new val zero() =>
         normal = Vec3.zero()
         front_face = false
         p = Vec3.zero()
         t = 0
+        material = Lambert(Vec3.zero())
 
-    new val from_ray(r: Ray, outward_normal: Vec3,  t': F64, p': Vec3) =>
+    new val from_ray(r: Ray, outward_normal: Vec3,  t': F64, p': Vec3, material': Material) =>
         t = t'
         p = p'
+        material = material'
 
         front_face = r.direction.dot(outward_normal) < 0
         normal = if front_face then
@@ -136,6 +121,41 @@ class HitShape is ShapeVisitor[(HitRecord | None)]
 
     fun apply(s: Shape): (HitRecord | None) =>
         s.accept[(HitRecord | None)](this)
+
+    fun visit_shape_list(s: ShapeList box): (HitRecord | None) =>
+        var hit_record: (HitRecord | None) = None
+        var closest_t = t_max
+
+        for shape in s.shapes.values() do
+            match HitShape(r, t_min, closest_t)(shape)
+            | let rec: HitRecord =>
+                hit_record = rec
+                closest_t = rec.t
+            | None => continue
+            end
+        end
+
+        hit_record
+
+    fun visit_shape_bvh(s: ShapeBVH box): (HitRecord | None) =>
+        if not s.bounding_box.hit(r, t_min, t_max) then
+            return None
+        end
+
+        let hit_left = HitShape(r, t_min, t_max)(s.left)
+        let hit_right = HitShape(r, t_min, match hit_left
+            | let rec: HitRecord => rec.t
+            | None => t_max
+            end
+        )(s.right)
+
+        match (hit_left, hit_right)
+        | (None, None) => None
+        | (let le: HitRecord, None) => le
+        | (None, let ri: HitRecord) => ri
+        | (let le: HitRecord, let ri: HitRecord) =>
+            if ri.t < le.t then ri else le end
+        end
 
     fun visit_sphere(s: Sphere box): (HitRecord | None) =>
         let oc = r.origin - s.origin
@@ -162,7 +182,7 @@ class HitShape is ShapeVisitor[(HitRecord | None)]
         end
 
         let p = r.at(root)
-        HitRecord.from_ray(r, (p - s.origin) / s.radius, root, p)
+        HitRecord.from_ray(r, (p - s.origin) / s.radius, root, p, s.material)
 
 class val ScatterMaterial is MaterialVisitor[((Vec3, Ray) | None)] // (color, attenuation)
     let _rand: Rand ref

@@ -1,21 +1,15 @@
+use "debug"
+
 use messages = "../messages"
 use "../math"
 
 class val Scene
-    let objects: Array[Object] val
+    let root_shape: Shape
     let camera: Camera
 
-    new val create(objects': Array[Object] val, camera': Camera) =>
-        objects = objects'
+    new val create(root_shape': Shape, camera': Camera) =>
+        root_shape = root_shape'
         camera = camera'
-
-class val Object
-    let shape: Shape
-    let material: Material
-
-    new val create(shape': Shape val, material': Material val) =>
-        shape = shape'
-        material = material'
 
 class val Camera
     let origin: Point3
@@ -54,17 +48,27 @@ class val Camera
         lens_radius = aperture/2
 
 primitive Transform
-    // At the moment this only transforms a scene from the types
-    // defined in messages to the internal types. In the future
-    // this might do more significant transforms (BVH?)
+    // Transform the scene from the wire into a structure we can trace with
     fun apply(scene': messages.Scene, config': messages.Config): Scene =>
-        let objects' = recover Array[Object](scene'.objects.size()) end
+        let shapes' = recover Array[Shape](scene'.objects.size()) end
 
         for o in scene'.objects.values() do
-            objects'.push(transform_object(o))
+            // TODO: Objects with multiple shapes
+            shapes'.push(transform_object(o))
         end
 
-        Scene(consume objects', transform_camera(scene'.camera, config'))
+        let root_shape = if config'.use_bvh then
+            try
+                ConstructBVH(consume shapes')?
+            else
+                Debug("BVH construction FUCKED" where stream=DebugErr)
+                ShapeList(recover Array[Shape]() end)
+            end
+        else
+            ShapeList(consume shapes')
+        end
+
+        Scene(root_shape, transform_camera(scene'.camera, config'))
 
     fun transform_camera(camera': messages.Camera, config': messages.Config): Camera =>
         Camera(where
@@ -76,18 +80,16 @@ primitive Transform
             aspect_ratio = config'.aspect_ratio
         )
 
-    fun transform_object(object': messages.Object): Object =>
-        Object(where
-            shape' = transform_shape(object'.shape),
-            material' = transform_material(object'.material)
-        )
+    fun transform_object(object': messages.Object): Shape =>
+        transform_shape(object'.shape, transform_material(object'.material))
 
-    fun transform_shape(shape: messages.Shape): Shape =>
+    fun transform_shape(shape: messages.Shape, material: Material): Shape =>
         match shape.one_of
         | let s: messages.Sphere =>
             Sphere(where
                 origin' = transform_position(s.origin),
-                radius' = s.radius
+                radius' = s.radius,
+                material' = material
             )
         end
 

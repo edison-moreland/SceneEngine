@@ -247,6 +247,7 @@ func getConfig(o *tengo.Map) (messages.Config, error) {
 	config.FrameCount = 1
 	config.Depth = 50
 	config.Samples = 50
+	config.UseBvh = true
 
 	for key, val := range o.Value {
 		switch key {
@@ -286,6 +287,12 @@ func getConfig(o *tengo.Map) (messages.Config, error) {
 				return config, fmt.Errorf("%w: got %T for %s", ErrConfigValueIncorrectType, val, key)
 			}
 			config.FrameSpeed = uint64(frameSpeed)
+		case "use_bvh":
+			useBVH, ok := tengo.ToBool(val)
+			if !ok {
+				return config, fmt.Errorf("%w: got %T for %s", ErrConfigValueIncorrectType, val, key)
+			}
+			config.UseBvh = useBVH
 		default:
 			return config, fmt.Errorf("%w: %s", ErrUnknownConfigValue, key)
 		}

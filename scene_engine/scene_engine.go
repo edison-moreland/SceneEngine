@@ -67,7 +67,7 @@ func main() {
 	err = RunPhases(logger, LoadScript, map[AppPhaseId]AppPhase{
 		Preview:    PreviewPhase(scriptFileWatcher, &sceneCache),
 		LoadScript: LoadScriptPhase(&sceneCache, scriptPath),
-		Render:     RenderPhase(renderCore, &sceneCache, exportDir(scriptPath)),
+		Render:     RenderPhase(logger, renderCore, &sceneCache, exportDir(scriptPath)),
 		Encode:     EncodePhase(&sceneCache, exportDir(scriptPath)),
 	})
 	if err != nil {
@@ -274,6 +274,7 @@ func (p *preview) Draw() {
 
 type render struct {
 	emptyPhase
+	logger *zap.Logger
 
 	core       *core.RenderCore
 	target     *renderTarget
@@ -287,8 +288,10 @@ type render struct {
 	frameElapsed   rollingAverage
 }
 
-func RenderPhase(core *core.RenderCore, sceneCache *script.SceneCache, exportDir string) AppPhase {
+func RenderPhase(logger *zap.Logger, core *core.RenderCore, sceneCache *script.SceneCache, exportDir string) AppPhase {
 	r := render{
+		logger: logger,
+
 		core:       core,
 		sceneCache: sceneCache,
 		exportPath: exportDir,
@@ -311,6 +314,7 @@ func (r *render) prepareExportDir() error {
 }
 
 func (r *render) startFrame() {
+	r.logger.Info("Starting render", zap.Uint64("frame", r.currentFrame))
 	scene := r.sceneCache.Scene(r.currentFrame)
 
 	r.lastFrameStart = time.Now()
@@ -353,7 +357,10 @@ func (r *render) Think() (AppPhaseId, error) {
 
 	r.target.RenderBufferToTexture()
 	if r.target.done {
-		r.frameElapsed.Sample(time.Since(r.lastFrameStart))
+		frameTime := time.Since(r.lastFrameStart)
+		r.logger.Info("Finished frame", zap.Duration("frame_time", frameTime))
+
+		r.frameElapsed.Sample(frameTime)
 		r.target.Export(r.exportPath, r.currentFrame)
 		r.renderActive = false
 	}

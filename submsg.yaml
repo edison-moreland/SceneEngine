@@ -15,6 +15,7 @@ types:
       depth: Uint
       frame_count: Uint
       frame_speed: Uint
+      use_bvh: Bool
 
   - name: position
     type: struct

@@ -38,27 +38,23 @@ var ColorModule = map[string]tengo.Object{
 	}},
 
 	"Random": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-		value := float32(1.0)
+		saturation := float32(0.5)
 		switch len(args) {
 		case 1:
-			newValue, ok := tengo.ToFloat64(args[0])
+			newSaturation, ok := tengo.ToFloat64(args[0])
 			if !ok {
-				return nil, tengo.ErrInvalidArgumentType{Name: "value"}
+				return nil, tengo.ErrInvalidArgumentType{Name: "saturation"}
 			}
-			value = float32(newValue)
+			saturation = float32(newSaturation)
 		case 0:
 			break
 		default:
 			return nil, tengo.ErrWrongNumArguments
 		}
 
-		if len(args) != 0 {
-			return nil, tengo.ErrWrongNumArguments
-		}
-
 		hue := rl.GetRandomValue(0, 360)
 
-		color := rl.ColorFromHSV(float32(hue), 0.5, value)
+		color := rl.ColorFromHSV(float32(hue), saturation, 1.0)
 
 		return &Color{Value: messages.Color{
 			R: color.R,

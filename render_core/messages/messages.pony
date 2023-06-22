@@ -127,6 +127,7 @@ class val Config is MsgPackMarshalable
     var image_height: U64
     var image_width: U64
     var samples: U64
+    var use_bvh: Bool
 
     new val create(
         aspect_ratio': F64,
@@ -135,7 +136,8 @@ class val Config is MsgPackMarshalable
         frame_speed': U64,
         image_height': U64,
         image_width': U64,
-        samples': U64
+        samples': U64,
+        use_bvh': Bool
         ) =>
         aspect_ratio = aspect_ratio'
         depth = depth'
@@ -144,6 +146,7 @@ class val Config is MsgPackMarshalable
         image_height = image_height'
         image_width = image_width'
         samples = samples'
+        use_bvh = use_bvh'
 
     new val zero() =>
         aspect_ratio = 0.0
@@ -153,9 +156,10 @@ class val Config is MsgPackMarshalable
         image_height = 0
         image_width = 0
         samples = 0
+        use_bvh = false
 
     fun marshal_msgpack(w: Writer ref)? =>
-        MessagePackEncoder.fixmap(w, 7)?
+        MessagePackEncoder.fixmap(w, 8)?
         MessagePackEncoder.fixstr(w, "AspectRatio")?
         MessagePackEncoder.float_64(w, aspect_ratio)
         MessagePackEncoder.fixstr(w, "Depth")?
@@ -170,6 +174,8 @@ class val Config is MsgPackMarshalable
         MessagePackEncoder.uint_64(w, image_width)
         MessagePackEncoder.fixstr(w, "Samples")?
         MessagePackEncoder.uint_64(w, samples)
+        MessagePackEncoder.fixstr(w, "UseBvh")?
+        MessagePackEncoder.bool(w, use_bvh)
 
 primitive UnmarshalMsgPackConfig
     fun apply(r: Reader ref): Config =>
@@ -180,6 +186,7 @@ primitive UnmarshalMsgPackConfig
         var image_height': U64 = 0
         var image_width': U64 = 0
         var samples': U64 = 0
+        var use_bvh': Bool = false
 
         try
             let map_size = Unmarshal.map(r)?
@@ -200,6 +207,8 @@ primitive UnmarshalMsgPackConfig
                     image_width' = MessagePackDecoder.u64(r)?
                 | "Samples" =>
                     samples' = MessagePackDecoder.u64(r)?
+                | "UseBvh" =>
+                    use_bvh' = MessagePackDecoder.bool(r)?
                 else
                     var error_message = String()
                     error_message.append("unknown field: ")
@@ -219,7 +228,8 @@ primitive UnmarshalMsgPackConfig
         frame_speed',
         image_height',
         image_width',
-        samples'
+        samples',
+        use_bvh'
         )
 class val Position is MsgPackMarshalable
     var x: F64
