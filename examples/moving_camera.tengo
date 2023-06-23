@@ -1,8 +1,4 @@
 math := import("math")
-vec3 := import("vec3")
-color := import("color")
-s := import("shape")
-m := import("material")
 
 config := {
     aspect_ratio: (3.0 / 2.0),
@@ -21,31 +17,31 @@ export scene(config, func(frame, seconds) {
     orbit_z := math.cos(seconds*orbit_speed)*orbit_distance
 
     camera(
-        vec3.New(orbit_x, 3, orbit_z),
-        vec3.New(0, 1, 0),
+        vec3(orbit_x, 3, orbit_z),
+        vec3(0, 1, 0),
         30
     )
 
     sphere_distance := 2
 
     object(
-        s.Sphere(vec3.New(0, 1, 0), 1),
-        m.Dielectric(1.5)
+        sphere(vec3(0, 1, 0), 1),
+        dielectric(1.5)
     )
 
     object(
-        s.Sphere(vec3.New(-sphere_distance, 1, 0), 1),
-        m.Lambert(color.New(102, 51, 25))
+        sphere(vec3(-sphere_distance, 1, 0), 1),
+        lambert(color(102, 51, 25))
     )
 
     object(
-        s.Sphere(vec3.New(sphere_distance, 1, 0), 1),
-        m.Metal(color.New(178, 153, 127), 0.0)
+        sphere(vec3(sphere_distance, 1, 0), 1),
+        metal(color(178, 153, 127), 0.0)
     )
 
     // Ground sphere
     object(
-        s.Sphere(vec3.New(0, -1000, 0), 1000),
-        m.Lambert(color.New(127, 127, 127))
+        sphere(vec3(0, -1000, 0), 1000),
+        lambert(color(127, 127, 127))
     )
 })
