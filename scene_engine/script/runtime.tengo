@@ -1,12 +1,8 @@
-runtime := import("runtime")
 userscript := import("userscript")
 
-runtime.config(userscript.config)
+frame := rt_begin(userscript.config)
 
-for {
-    request := runtime.next()
-
-    userscript.scene(request.scene_gen, request.frame, request.seconds)
-
-    request.done()
+for i := 1; i <= frame.count; i++ {
+    userscript.scene(i, i*frame.seconds)
+    rt_commit_scene(i)
 }

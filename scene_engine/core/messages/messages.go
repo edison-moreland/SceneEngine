@@ -7,50 +7,6 @@ import (
 )
 
 const (
-	CoreMsgInfo        submsg.MsgId = 0
-	CoreMsgConfig      submsg.MsgId = 1
-	CoreMsgRenderFrame submsg.MsgId = 2
-)
-
-type CoreServer interface {
-	Info(body []byte) error
-	Config(body []byte) error
-	RenderFrame(body []byte) error
-}
-
-func CoreRouter(s CoreServer) submsg.MsgReceiver {
-	return func(id submsg.MsgId, body []byte) error {
-		switch id {
-		case CoreMsgInfo:
-			return s.Info(body)
-		case CoreMsgConfig:
-			return s.Config(body)
-		case CoreMsgRenderFrame:
-			return s.RenderFrame(body)
-		default:
-			return submsg.ErrMsgIdUnknown
-		}
-	}
-}
-
-type CoreClient struct {
-	s submsg.MsgSender
-}
-
-func NewCoreClient(s submsg.MsgSender) *CoreClient {
-	return &CoreClient{s: s}
-}
-func (c *CoreClient) Info(b []byte) {
-	c.s(CoreMsgInfo, b)
-}
-func (c *CoreClient) Config(b []byte) {
-	c.s(CoreMsgConfig, b)
-}
-func (c *CoreClient) RenderFrame(b []byte) {
-	c.s(CoreMsgRenderFrame, b)
-}
-
-const (
 	EngineMsgCoreReady  submsg.MsgId = 0
 	EngineMsgCoreInfo   submsg.MsgId = 1
 	EngineMsgPixelBatch submsg.MsgId = 2
@@ -92,6 +48,50 @@ func (c *EngineClient) CoreInfo(b []byte) {
 }
 func (c *EngineClient) PixelBatch(b []byte) {
 	c.s(EngineMsgPixelBatch, b)
+}
+
+const (
+	CoreMsgInfo        submsg.MsgId = 0
+	CoreMsgConfig      submsg.MsgId = 1
+	CoreMsgRenderFrame submsg.MsgId = 2
+)
+
+type CoreServer interface {
+	Info(body []byte) error
+	Config(body []byte) error
+	RenderFrame(body []byte) error
+}
+
+func CoreRouter(s CoreServer) submsg.MsgReceiver {
+	return func(id submsg.MsgId, body []byte) error {
+		switch id {
+		case CoreMsgInfo:
+			return s.Info(body)
+		case CoreMsgConfig:
+			return s.Config(body)
+		case CoreMsgRenderFrame:
+			return s.RenderFrame(body)
+		default:
+			return submsg.ErrMsgIdUnknown
+		}
+	}
+}
+
+type CoreClient struct {
+	s submsg.MsgSender
+}
+
+func NewCoreClient(s submsg.MsgSender) *CoreClient {
+	return &CoreClient{s: s}
+}
+func (c *CoreClient) Info(b []byte) {
+	c.s(CoreMsgInfo, b)
+}
+func (c *CoreClient) Config(b []byte) {
+	c.s(CoreMsgConfig, b)
+}
+func (c *CoreClient) RenderFrame(b []byte) {
+	c.s(CoreMsgRenderFrame, b)
 }
 
 type MsgCoreInfo struct {
