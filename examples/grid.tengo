@@ -6,6 +6,13 @@ rand := import("rand")
 s := import("shape")
 m := import("material")
 
+config := {
+    aspect_ratio: 1.0,
+    image_width: 800,
+    samples: 500,
+    depth: 100
+}
+
 // This scene was made to test the speed up from BVH
 
 grid_size := 10
@@ -18,34 +25,25 @@ grid_stride := (sphere_radius *2) + sphere_spacing
 grid_width := grid_stride * (grid_size - 1)
 grid_start := -(grid_width/2)
 
-export {
-    config: {
-        aspect_ratio: 1.0,
-        image_width: 800,
-        samples: 500,
-        depth: 100
-    },
-
-    scene: func(se, frame, seconds) {
-        for i := 0; i < grid_size; i++ {
-            for j := 0; j < grid_size; j++ {
-                for k := 0; k < grid_size; k++ {
-                    se.Object(
-                        s.Sphere(vec3.New(
-                            grid_start + (i * grid_stride),
-                            grid_start + (j * grid_stride),
-                            grid_start + (k * grid_stride)
-                        ), sphere_radius),
-                        m.Metal(color.Random(0.7), 0.5)
-                    )
-                }
+export scene(config, func(frame, seconds) {
+    for i := 0; i < grid_size; i++ {
+        for j := 0; j < grid_size; j++ {
+            for k := 0; k < grid_size; k++ {
+                object(
+                    s.Sphere(vec3.New(
+                        grid_start + (i * grid_stride),
+                        grid_start + (j * grid_stride),
+                        grid_start + (k * grid_stride)
+                    ), sphere_radius),
+                    m.Metal(color.Random(0.7), 0.5)
+                )
             }
         }
-
-        se.Camera(
-            vec3.New(100, 200, 300),
-            vec3.New(0, 0, 0),
-            20
-        )
     }
-}
+
+    camera(
+        vec3.New(100, 200, 300),
+        vec3.New(0, 0, 0),
+        20
+    )
+})

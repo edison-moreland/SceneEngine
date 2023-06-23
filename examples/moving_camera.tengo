@@ -4,50 +4,48 @@ color := import("color")
 s := import("shape")
 m := import("material")
 
-export {
-    config: {
-        aspect_ratio: (3.0 / 2.0),
-        image_width: 400,
-        samples: 50,
-        depth: 50,
-        frame_count: (30 * 5),
-        frame_speed: 30
-    },
-
-    scene: func(se, frame, seconds) {
-        orbit_speed := 5
-        orbit_distance := 10
-
-        orbit_x := math.sin(seconds*orbit_speed)*orbit_distance
-        orbit_z := math.cos(seconds*orbit_speed)*orbit_distance
-
-        se.Camera(
-            vec3.New(orbit_x, 3, orbit_z),
-            vec3.New(0, 1, 0),
-            30
-        )
-
-        sphere_distance := 2
-
-        se.Object(
-            s.Sphere(vec3.New(0, 1, 0), 1),
-            m.Dielectric(1.5)
-        )
-
-        se.Object(
-            s.Sphere(vec3.New(-sphere_distance, 1, 0), 1),
-            m.Lambert(color.New(102, 51, 25))
-        )
-
-        se.Object(
-            s.Sphere(vec3.New(sphere_distance, 1, 0), 1),
-            m.Metal(color.New(178, 153, 127), 0.0)
-        )
-
-        // Ground sphere
-        se.Object(
-            s.Sphere(vec3.New(0, -1000, 0), 1000),
-            m.Lambert(color.New(127, 127, 127))
-        )
-    }
+config := {
+    aspect_ratio: (3.0 / 2.0),
+    image_width: 400,
+    samples: 50,
+    depth: 50,
+    frame_count: (30 * 5),
+    frame_speed: 30
 }
+
+export scene(config, func(frame, seconds) {
+    orbit_speed := 5
+    orbit_distance := 10
+
+    orbit_x := math.sin(seconds*orbit_speed)*orbit_distance
+    orbit_z := math.cos(seconds*orbit_speed)*orbit_distance
+
+    camera(
+        vec3.New(orbit_x, 3, orbit_z),
+        vec3.New(0, 1, 0),
+        30
+    )
+
+    sphere_distance := 2
+
+    object(
+        s.Sphere(vec3.New(0, 1, 0), 1),
+        m.Dielectric(1.5)
+    )
+
+    object(
+        s.Sphere(vec3.New(-sphere_distance, 1, 0), 1),
+        m.Lambert(color.New(102, 51, 25))
+    )
+
+    object(
+        s.Sphere(vec3.New(sphere_distance, 1, 0), 1),
+        m.Metal(color.New(178, 153, 127), 0.0)
+    )
+
+    // Ground sphere
+    object(
+        s.Sphere(vec3.New(0, -1000, 0), 1000),
+        m.Lambert(color.New(127, 127, 127))
+    )
+})
