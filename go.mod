@@ -18,3 +18,5 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/sys v0.0.0-20220908164124-27713097b956 // indirect
 )
+
+replace github.com/d5/tengo/v2 => github.com/edison-moreland/tengo/v2 v2.0.0-20230623191204-1af957b8c051

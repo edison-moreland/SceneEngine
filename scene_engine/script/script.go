@@ -1,13 +1,13 @@
 package script
 
 import (
-	"context"
 	_ "embed"
 	"errors"
 	"fmt"
 	"os"
 
 	"github.com/d5/tengo/v2"
+	"github.com/d5/tengo/v2/parser"
 	"github.com/d5/tengo/v2/stdlib"
 
 	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
@@ -15,7 +15,6 @@ import (
 )
 
 var (
-	ErrConfigIsNotMap           = errors.New("config is not a map")
 	ErrUnknownConfigValue       = errors.New("unknown config value")
 	ErrConfigValueIncorrectType = errors.New("config value has the wrong type")
 )
@@ -23,44 +22,201 @@ var (
 //go:embed runtime.tengo
 var runtimeSource []byte
 
-type GenerateScene func(frame uint32, seconds float64) messages.Scene
-
-type sceneRequest struct {
-	frame    int64
-	seconds  float64
-	response chan<- messages.Scene
+func emptyScene() messages.Scene {
+	return messages.Scene{
+		Camera: messages.Camera{
+			Aperture: 0.1,
+			Fov:      90,
+			LookAt: messages.Position{
+				X: 0,
+				Y: 0,
+				Z: 0,
+			},
+			LookFrom: messages.Position{
+				X: 4,
+				Y: 0,
+				Z: 0,
+			},
+		},
+	}
 }
 
 func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
-	// TODO: Improve error reporting
+	globals := make([]tengo.Object, tengo.GlobalsSize)
+	symbolTable := tengo.NewSymbolTable()
 
-	request := make(chan sceneRequest)
-	defer close(request)
+	currentScene := emptyScene()
 
-	scriptCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// Globals are only available to the runtime
+	rtBegin := symbolTable.Define("rt_begin")
+	globals[rtBegin.Index] = &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
+		fmt.Println("rt_begin")
+		if len(args) != 1 {
+			return nil, tengo.ErrWrongNumArguments
+		}
 
-	config, err := startScript(scriptCtx, sceneScript, request)
+		configMap, ok := args[0].(*tengo.Map)
+		if !ok {
+			return nil, tengo.ErrInvalidArgumentType{Name: "config"}
+		}
+
+		userConfig, err := getConfig(configMap)
+		if err != nil {
+			return nil, err
+		}
+
+		sceneCache.Reset(userConfig)
+
+		return &tengo.Map{Value: map[string]tengo.Object{
+			"count":   &tengo.Int{Value: int64(userConfig.FrameCount)},
+			"seconds": &tengo.Float{Value: 1 / float64(userConfig.FrameSpeed)},
+		}}, nil
+	}}
+
+	rtCommitScene := symbolTable.Define("rt_commit_scene")
+	globals[rtCommitScene.Index] = &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
+		fmt.Println("rt_commit_scene")
+		if len(args) != 1 {
+			return nil, tengo.ErrWrongNumArguments
+		}
+
+		frame, ok := tengo.ToInt(args[0])
+		if !ok {
+			return nil, tengo.ErrInvalidArgumentType{Name: "frame"}
+		}
+
+		sceneCache.CacheScene(uint64(frame), currentScene)
+		currentScene = emptyScene()
+
+		return nil, nil
+	}}
+
+	// Builtins are available everywhere
+	customBuiltins := []*tengo.BuiltinFunction{
+		{
+			Name: "scene",
+			Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
+				fmt.Println("scene")
+				if len(args) != 2 {
+					return nil, tengo.ErrWrongNumArguments
+				}
+
+				return &tengo.Map{Value: map[string]tengo.Object{
+					"config": args[0],
+					"scene":  args[1],
+				}}, nil
+			},
+		},
+		{
+			Name: "object",
+			Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
+				fmt.Println("object")
+				if len(args) != 2 {
+					return nil, tengo.ErrWrongNumArguments
+				}
+
+				shape, ok := args[0].(*libraries.Shape)
+				if !ok {
+					return nil, tengo.ErrInvalidArgumentType{Name: "shape"}
+				}
+
+				material, ok := args[1].(*libraries.Material)
+				if !ok {
+					return nil, tengo.ErrInvalidArgumentType{Name: "material"}
+				}
+
+				currentScene.Objects = append(currentScene.Objects, messages.Object{
+					Material: material.Material,
+					Shape:    shape.Shape,
+				})
+
+				return nil, nil
+			},
+		},
+		{
+			Name: "camera",
+			Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
+				fmt.Println("camera")
+				argCount := len(args)
+				if argCount < 2 || argCount > 4 {
+					return nil, tengo.ErrWrongNumArguments
+				}
+
+				var ok bool
+
+				// First two are always look_from and look_at
+				lookFrom, ok := args[0].(*libraries.Vec3)
+				if !ok {
+					return nil, tengo.ErrInvalidArgumentType{Name: "look_from"}
+				}
+
+				lookAt, ok := args[1].(*libraries.Vec3)
+				if !ok {
+					return nil, tengo.ErrInvalidArgumentType{Name: "look_at"}
+				}
+
+				fov := float64(90)
+				aperture := 0.1
+				switch argCount {
+				case 4:
+					aperture, ok = tengo.ToFloat64(args[3])
+					if !ok {
+						return nil, tengo.ErrInvalidArgumentType{Name: "aperture"}
+					}
+
+					fallthrough
+				case 3:
+					fov, ok = tengo.ToFloat64(args[2])
+					if !ok {
+						return nil, tengo.ErrInvalidArgumentType{Name: "fov"}
+					}
+
+				}
+
+				currentScene.Camera = messages.Camera{
+					Aperture: aperture,
+					Fov:      fov,
+					LookAt:   lookAt.Position(),
+					LookFrom: lookFrom.Position(),
+				}
+
+				return nil, nil
+			},
+		},
+	}
+
+	builtins := append(tengo.GetAllBuiltinFunctions(), customBuiltins...)
+	for i, b := range builtins {
+		symbolTable.DefineBuiltin(i, b.Name)
+	}
+
+	source, err := os.ReadFile(sceneScript)
 	if err != nil {
 		return err
 	}
-	sceneCache.Reset(config)
 
-	requestScene := func(frame uint32, seconds float64) messages.Scene {
-		responseChan := make(chan messages.Scene)
-		defer close(responseChan)
+	moduleMap := tengo.NewModuleMap()
+	addStdLib(moduleMap, "fmt", "math", "rand")
+	moduleMap.AddSourceModule("userscript", source)
+	libraries.AddSceneEngineLibraries(moduleMap)
 
-		request <- sceneRequest{
-			frame:    int64(frame),
-			seconds:  seconds,
-			response: responseChan,
-		}
-
-		return <-responseChan
+	fileSet := parser.NewFileSet()
+	runtimeFile := fileSet.AddFile("runtime", -1, len(runtimeSource))
+	p := parser.NewParser(runtimeFile, runtimeSource, nil)
+	file, err := p.ParseFile()
+	if err != nil {
+		return err
 	}
 
-	for i := uint64(1); i <= config.FrameCount; i++ {
-		sceneCache.CacheScene(i, requestScene(uint32(i), float64(i)*(1.0/float64(config.FrameSpeed))))
+	c := tengo.NewCompiler(runtimeFile, symbolTable, nil, moduleMap, nil)
+	if err := c.Compile(file); err != nil {
+		return err
+	}
+
+	bytecode := c.Bytecode()
+	machine := tengo.NewVM(bytecode, builtins, globals, -1)
+	if err := machine.Run(); err != nil {
+		return err
 	}
 
 	return nil
@@ -70,176 +226,6 @@ func addStdLib(m *tengo.ModuleMap, libNames ...string) {
 	for _, lib := range libNames {
 		m.AddBuiltinModule(lib, stdlib.BuiltinModules[lib])
 	}
-}
-
-func startScript(ctx context.Context, sceneScript string, requests chan sceneRequest) (messages.Config, error) {
-	var config messages.Config
-
-	source, err := os.ReadFile(sceneScript)
-	if err != nil {
-		return config, err
-	}
-
-	configReturn := make(chan messages.Config)
-	defer close(configReturn)
-
-	moduleMap := tengo.NewModuleMap()
-	moduleMap.AddSourceModule("userscript", source)
-	addStdLib(moduleMap, "fmt", "math", "rand")
-	libraries.AddSceneEngineLibraries(moduleMap)
-
-	moduleMap.AddBuiltinModule("runtime", map[string]tengo.Object{
-		"config": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-			// Runtime is giving us the config defined by the userscript
-			if configReturn == nil {
-				panic("config can only be called once")
-			}
-
-			if len(args) != 1 {
-				panic("config expects more than one argument")
-			}
-
-			configMap, ok := args[0].(*tengo.Map)
-			if !ok {
-				return nil, ErrConfigIsNotMap
-			}
-
-			userConfig, err := getConfig(configMap)
-			if err != nil {
-				return nil, err
-			}
-
-			configReturn <- userConfig
-
-			return nil, nil
-		}},
-		"next": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-			// Runtime is asking for the next request
-			// When a request is ready, it returns an object with:
-			//   - A callback to call when request is done
-			//   - An object for creating scene objects
-			//   - The two scene arguments (frame, seconds)
-			request := <-requests
-
-			// This scene is populated by the scene_gen object
-			scene := messages.Scene{
-				Camera: messages.Camera{
-					Aperture: 0.1,
-					Fov:      90,
-					LookAt: messages.Position{
-						X: 0,
-						Y: 0,
-						Z: 0,
-					},
-					LookFrom: messages.Position{
-						X: 4,
-						Y: 0,
-						Z: 0,
-					},
-				},
-			}
-
-			return &tengo.Map{Value: map[string]tengo.Object{
-				"frame":   &tengo.Int{Value: request.frame},
-				"seconds": &tengo.Float{Value: request.seconds},
-				"scene_gen": &tengo.Map{Value: map[string]tengo.Object{
-
-					"Object": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-						if len(args) != 2 {
-							return nil, tengo.ErrWrongNumArguments
-						}
-
-						shape, ok := args[0].(*libraries.Shape)
-						if !ok {
-							return nil, tengo.ErrInvalidArgumentType{Name: "shape"}
-						}
-
-						material, ok := args[1].(*libraries.Material)
-						if !ok {
-							return nil, tengo.ErrInvalidArgumentType{Name: "material"}
-						}
-
-						scene.Objects = append(scene.Objects, messages.Object{
-							Material: material.Material,
-							Shape:    shape.Shape,
-						})
-
-						return nil, nil
-					}},
-					"Camera": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-						argCount := len(args)
-						if argCount < 2 || argCount > 4 {
-							return nil, tengo.ErrWrongNumArguments
-						}
-
-						var ok bool
-
-						// First two are always look_from and look_at
-						lookFrom, ok := args[0].(*libraries.Vec3)
-						if !ok {
-							return nil, tengo.ErrInvalidArgumentType{Name: "look_from"}
-						}
-
-						lookAt, ok := args[1].(*libraries.Vec3)
-						if !ok {
-							return nil, tengo.ErrInvalidArgumentType{Name: "look_at"}
-						}
-
-						fov := float64(90)
-						aperture := 0.1
-						switch argCount {
-						case 4:
-							aperture, ok = tengo.ToFloat64(args[3])
-							if !ok {
-								return nil, tengo.ErrInvalidArgumentType{Name: "aperture"}
-							}
-
-							fallthrough
-						case 3:
-							fov, ok = tengo.ToFloat64(args[2])
-							if !ok {
-								return nil, tengo.ErrInvalidArgumentType{Name: "fov"}
-							}
-
-						}
-
-						scene.Camera = messages.Camera{
-							Aperture: aperture,
-							Fov:      fov,
-							LookAt:   lookAt.Position(),
-							LookFrom: lookFrom.Position(),
-						}
-
-						return nil, nil
-					}},
-				}},
-				"done": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-					request.response <- scene
-
-					return nil, nil
-				}},
-			}}, nil
-		}},
-	})
-
-	runtime := tengo.NewScript(runtimeSource)
-	runtime.SetImports(moduleMap)
-
-	compiled, err := runtime.Compile()
-	if err != nil {
-		return config, err
-	}
-
-	go func() {
-		err := compiled.RunContext(ctx)
-		if err != nil {
-			if !errors.Is(err, context.Canceled) {
-				fmt.Println(err)
-			}
-		}
-	}()
-
-	return <-configReturn, nil
 }
 
 func getConfig(o *tengo.Map) (messages.Config, error) {

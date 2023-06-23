@@ -29,30 +29,28 @@ for i := 0; i < sphere_count; i++ {
     ])
 }
 
-export {
-    config: {
-        aspect_ratio: 1.0,
-        image_width: 600,
-        samples: 100,
-        depth: 50,
-        frame_count: (30*1),
-        frame_speed: 30
-    },
+config := {
+    aspect_ratio: 1.0,
+    image_width: 600,
+    samples: 100,
+    depth: 50,
+    frame_count: (30*1),
+    frame_speed: 30
+}
 
-    scene: func(se, frame, seconds) {
-        for i := 0; i < sphere_count; i++ {
-            spheres[i][0] = spheres[i][0] + random_vec_spread(0.7)
+export scene(config, func(frame, seconds) {
+    for i := 0; i < sphere_count; i++ {
+        spheres[i][0] = spheres[i][0] + random_vec_spread(0.7)
 
-            se.Object(
-                s.Sphere(spheres[i][0], spheres[i][1]),
-                m.Lambert(spheres[i][2])
-            )
-        }
-
-        se.Camera(
-            vec3.New(10, 0, 0),
-            vec3.New(0, 0, 0),
-            90
+        object(
+            s.Sphere(spheres[i][0], spheres[i][1]),
+            m.Lambert(spheres[i][2])
         )
     }
-}
+
+    camera(
+        vec3.New(10, 0, 0),
+        vec3.New(0, 0, 0),
+        90
+    )
+})
