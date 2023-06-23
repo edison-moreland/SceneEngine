@@ -11,7 +11,7 @@ import (
 	"github.com/d5/tengo/v2/stdlib"
 
 	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
-	"github.com/edison-moreland/SceneEngine/scene_engine/script/libraries"
+	"github.com/edison-moreland/SceneEngine/scene_engine/script/builtins"
 )
 
 var (
@@ -115,12 +115,12 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 					return nil, tengo.ErrWrongNumArguments
 				}
 
-				shape, ok := args[0].(*libraries.Shape)
+				shape, ok := args[0].(*builtins.Shape)
 				if !ok {
 					return nil, tengo.ErrInvalidArgumentType{Name: "shape"}
 				}
 
-				material, ok := args[1].(*libraries.Material)
+				material, ok := args[1].(*builtins.Material)
 				if !ok {
 					return nil, tengo.ErrInvalidArgumentType{Name: "material"}
 				}
@@ -145,12 +145,12 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 				var ok bool
 
 				// First two are always look_from and look_at
-				lookFrom, ok := args[0].(*libraries.Vec3)
+				lookFrom, ok := args[0].(*builtins.Vec3)
 				if !ok {
 					return nil, tengo.ErrInvalidArgumentType{Name: "look_from"}
 				}
 
-				lookAt, ok := args[1].(*libraries.Vec3)
+				lookAt, ok := args[1].(*builtins.Vec3)
 				if !ok {
 					return nil, tengo.ErrInvalidArgumentType{Name: "look_at"}
 				}
@@ -185,8 +185,9 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 		},
 	}
 
-	builtins := append(tengo.GetAllBuiltinFunctions(), customBuiltins...)
-	for i, b := range builtins {
+	allBuiltins := append(tengo.GetAllBuiltinFunctions(), customBuiltins...)
+	allBuiltins = append(allBuiltins, builtins.SceneEngineBuiltins...)
+	for i, b := range allBuiltins {
 		symbolTable.DefineBuiltin(i, b.Name)
 	}
 
@@ -198,7 +199,7 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 	moduleMap := tengo.NewModuleMap()
 	addStdLib(moduleMap, "fmt", "math", "rand")
 	moduleMap.AddSourceModule("userscript", source)
-	libraries.AddSceneEngineLibraries(moduleMap)
+	//libraries.AddSceneEngineLibraries(moduleMap)
 
 	fileSet := parser.NewFileSet()
 	runtimeFile := fileSet.AddFile("runtime", -1, len(runtimeSource))
@@ -214,7 +215,7 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 	}
 
 	bytecode := c.Bytecode()
-	machine := tengo.NewVM(bytecode, builtins, globals, -1)
+	machine := tengo.NewVM(bytecode, allBuiltins, globals, -1)
 	if err := machine.Run(); err != nil {
 		return err
 	}

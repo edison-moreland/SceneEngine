@@ -1,4 +1,4 @@
-package libraries
+package builtins
 
 import (
 	"fmt"
@@ -10,33 +10,31 @@ import (
 	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
 )
 
-var Vec3Module = map[string]tengo.Object{
-	"New": &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-		if len(args) != 3 {
-			return nil, tengo.ErrWrongNumArguments
-		}
+func builtinVec3(args ...tengo.Object) (ret tengo.Object, err error) {
+	if len(args) != 3 {
+		return nil, tengo.ErrWrongNumArguments
+	}
 
-		x, ok := tengo.ToFloat64(args[0])
-		if !ok {
-			return nil, tengo.ErrInvalidArgumentType{Name: "X"}
-		}
+	x, ok := tengo.ToFloat64(args[0])
+	if !ok {
+		return nil, tengo.ErrInvalidArgumentType{Name: "X"}
+	}
 
-		y, ok := tengo.ToFloat64(args[1])
-		if !ok {
-			return nil, tengo.ErrInvalidArgumentType{Name: "Y"}
-		}
+	y, ok := tengo.ToFloat64(args[1])
+	if !ok {
+		return nil, tengo.ErrInvalidArgumentType{Name: "Y"}
+	}
 
-		z, ok := tengo.ToFloat64(args[2])
-		if !ok {
-			return nil, tengo.ErrInvalidArgumentType{Name: "Z"}
-		}
+	z, ok := tengo.ToFloat64(args[2])
+	if !ok {
+		return nil, tengo.ErrInvalidArgumentType{Name: "Z"}
+	}
 
-		return newVec3(rl.NewVector3(
-			float32(x),
-			float32(y),
-			float32(z),
-		)), nil
-	}},
+	return newVec3(rl.NewVector3(
+		float32(x),
+		float32(y),
+		float32(z),
+	)), nil
 }
 
 // Vec3 is a tengo vector
