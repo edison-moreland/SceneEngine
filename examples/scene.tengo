@@ -1,15 +1,10 @@
 math := import("math")
-rand := import("rand")
 
-vec3_rand := func() {
-   return vec3(rand.float(), rand.float(), rand.float())
-}
-
-vec3_rand_spread := func(spread) {
+rand_vec3_spread := func(spread) {
    return vec3(
-       (rand.float()*spread)-(spread/2),
-       (rand.float()*spread)-(spread/2),
-       (rand.float()*spread)-(spread/2)
+       (rand_float()*spread)-(spread/2),
+       (rand_float()*spread)-(spread/2),
+       (rand_float()*spread)-(spread/2)
    )
 }
 
@@ -18,9 +13,9 @@ sphere_count := 50
 spheres := []
 for i := 0; i < sphere_count; i++ {
     spheres = append(spheres, [
-        vec3_rand_spread(spread),
-        rand.float(),
-        color_rand()
+        rand_vec3_spread(spread),
+        rand_float(),
+        rand_color()
     ])
 }
 
@@ -35,7 +30,7 @@ config := {
 
 export scene(config, func(frame, seconds) {
     for i := 0; i < sphere_count; i++ {
-        spheres[i][0] = spheres[i][0] + vec3_rand_spread(0.7)
+        spheres[i][0] = spheres[i][0] + rand_vec3_spread(0.7)
 
         object(
             sphere(spheres[i][0], spheres[i][1]),

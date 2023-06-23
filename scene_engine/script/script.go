@@ -50,7 +50,6 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 	// Globals are only available to the runtime
 	rtBegin := symbolTable.Define("rt_begin")
 	globals[rtBegin.Index] = &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-		fmt.Println("rt_begin")
 		if len(args) != 1 {
 			return nil, tengo.ErrWrongNumArguments
 		}
@@ -75,7 +74,6 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 
 	rtCommitScene := symbolTable.Define("rt_commit_scene")
 	globals[rtCommitScene.Index] = &tengo.UserFunction{Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-		fmt.Println("rt_commit_scene")
 		if len(args) != 1 {
 			return nil, tengo.ErrWrongNumArguments
 		}
@@ -96,7 +94,6 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 		{
 			Name: "scene",
 			Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-				fmt.Println("scene")
 				if len(args) != 2 {
 					return nil, tengo.ErrWrongNumArguments
 				}
@@ -110,7 +107,6 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 		{
 			Name: "object",
 			Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-				fmt.Println("object")
 				if len(args) != 2 {
 					return nil, tengo.ErrWrongNumArguments
 				}
@@ -136,7 +132,6 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 		{
 			Name: "camera",
 			Value: func(args ...tengo.Object) (ret tengo.Object, err error) {
-				fmt.Println("camera")
 				argCount := len(args)
 				if argCount < 2 || argCount > 4 {
 					return nil, tengo.ErrWrongNumArguments

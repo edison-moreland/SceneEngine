@@ -93,6 +93,8 @@ func (v *Vec3) IndexGet(index tengo.Object) (tengo.Object, error) {
 		return &tengo.Float{Value: float64(v.Value.Y)}, nil
 	case "z":
 		return &tengo.Float{Value: float64(v.Value.Z)}, nil
+	case "length":
+		return &tengo.Float{Value: float64(rl.Vector3Length(v.Value))}, nil
 	default:
 		return tengo.UndefinedValue, nil
 	}
