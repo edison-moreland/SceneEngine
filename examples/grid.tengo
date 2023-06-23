@@ -30,7 +30,7 @@ export scene(config, func(frame, seconds) {
                         grid_start + (j * grid_stride),
                         grid_start + (k * grid_stride)
                     ), sphere_radius),
-                    metal(color_rand(0.7), 0.5)
+                    metal(rand_color(0.7), 0.5)
                 )
             }
         }

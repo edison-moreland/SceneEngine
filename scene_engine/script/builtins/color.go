@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/d5/tengo/v2"
-	rl "github.com/gen2brain/raylib-go/raylib"
 
 	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
 )
@@ -33,32 +32,6 @@ func builtinColor(args ...tengo.Object) (ret tengo.Object, err error) {
 		R: uint8(r),
 		G: uint8(g),
 		B: uint8(b),
-	}}, nil
-}
-
-func builtinRandColor(args ...tengo.Object) (ret tengo.Object, err error) {
-	saturation := float32(0.5)
-	switch len(args) {
-	case 1:
-		newSaturation, ok := tengo.ToFloat64(args[0])
-		if !ok {
-			return nil, tengo.ErrInvalidArgumentType{Name: "saturation"}
-		}
-		saturation = float32(newSaturation)
-	case 0:
-		break
-	default:
-		return nil, tengo.ErrWrongNumArguments
-	}
-
-	hue := rl.GetRandomValue(0, 360)
-
-	color := rl.ColorFromHSV(float32(hue), saturation, 1.0)
-
-	return &Color{Value: messages.Color{
-		R: color.R,
-		G: color.G,
-		B: color.B,
 	}}, nil
 }
 
