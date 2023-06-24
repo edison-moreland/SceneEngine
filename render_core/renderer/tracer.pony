@@ -95,7 +95,7 @@ class val HitRecord
         front_face = false
         p = Vec3.zero()
         t = 0
-        material = Lambert(Vec3.zero())
+        material = Diffuse(Vec3.zero())
 
     new val from_ray(r: Ray, outward_normal: Vec3,  t': F64, p': Vec3, material': Material) =>
         t = t'
@@ -198,7 +198,7 @@ class val ScatterMaterial is MaterialVisitor[((Vec3, Ray) | None)] // (color, at
     fun ref apply(m: Material): ((Vec3, Ray) | None) =>
         m.accept[((Vec3, Ray) | None)](this)
 
-    fun ref visit_lambert(l: Lambert box): ((Vec3, Ray) | None) =>
+    fun ref visit_diffuse(d: Diffuse box): ((Vec3, Ray) | None) =>
         var scatter_direction = rec.normal + RandomVec3.unit_circle(_rand)
 
         if scatter_direction.near_zero() then
@@ -206,11 +206,11 @@ class val ScatterMaterial is MaterialVisitor[((Vec3, Ray) | None)] // (color, at
         end
 
         (
-            l.albedo,
+            d.albedo,
             Ray(rec.p, scatter_direction)
         )
 
-    fun ref visit_metal(m: Metal box): ((Vec3, Ray) | None) =>
+    fun ref visit_metallic(m: Metallic box): ((Vec3, Ray) | None) =>
         let reflected = ray_in.direction.unit().reflect(rec.normal)
 
         (

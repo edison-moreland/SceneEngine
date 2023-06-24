@@ -5,7 +5,7 @@ config := {
     aspect_ratio: 1.0,
     image_width: 800,
     samples: 500,
-    depth: 100
+    depth: 50
 }
 
 // This scene was made to test the speed up from BVH
@@ -21,6 +21,8 @@ grid_width := grid_stride * (grid_size - 1)
 grid_start := -(grid_width/2)
 
 export scene(config, func(frame, seconds) {
+    camera(vec3(100, 200, 300), vec3(0, 0, 0), 20)
+
     for i := 0; i < grid_size; i++ {
         for j := 0; j < grid_size; j++ {
             for k := 0; k < grid_size; k++ {
@@ -30,15 +32,14 @@ export scene(config, func(frame, seconds) {
                         grid_start + (j * grid_stride),
                         grid_start + (k * grid_stride)
                     ), sphere_radius),
-                    metal(rand_color(0.7), 0.5)
+                    rand_choice(
+                        [0.80, diffuse(rand_color())],
+                        [0.15, metallic(rand_color(0.5), rand_float()/2)],
+                        [0.05, dielectric(1.5)]
+                    )
                 )
             }
         }
     }
 
-    camera(
-        vec3(100, 200, 300),
-        vec3(0, 0, 0),
-        20
-    )
 })

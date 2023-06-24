@@ -38,12 +38,12 @@ types:
       y: Uint
       color: color
 
-  - name: lambert
+  - name: diffuse
     type: struct
     fields:
       albedo: color
 
-  - name: metal
+  - name: metallic
     type: struct
     fields:
       albedo: color
@@ -57,8 +57,8 @@ types:
   - name: material
     type: one_of
     members:
-      - lambert
-      - metal
+      - diffuse
+      - metallic
       - dielectric
 
   - name: sphere

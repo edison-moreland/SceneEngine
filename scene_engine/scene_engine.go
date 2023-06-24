@@ -206,9 +206,9 @@ func (p *preview) drawScenePreview() {
 	for _, object := range scene.Objects {
 		objectColor := rl.Gray
 		switch m := object.Material.OneOf.(type) {
-		case messages.Lambert:
+		case messages.Diffuse:
 			objectColor = p.colorToColor(m.Albedo)
-		case messages.Metal:
+		case messages.Metallic:
 			objectColor = p.colorToColor(m.Albedo)
 
 			// Dielectric gets default color

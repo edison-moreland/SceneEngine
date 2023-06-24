@@ -102,12 +102,12 @@ primitive Transform
 
     fun transform_material(material: messages.Material): Material =>
         match material.one_of
-        | let l: messages.Lambert =>
-            Lambert(where
+        | let l: messages.Diffuse =>
+            Diffuse(where
                 albedo' = transform_color(l.albedo)
             )
-        | let m: messages.Metal =>
-            Metal(where
+        | let m: messages.Metallic =>
+            Metallic(where
                 albedo' = transform_color(m.albedo),
                 scatter' = m.scatter
             )

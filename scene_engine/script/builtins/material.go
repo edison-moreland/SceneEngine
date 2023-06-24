@@ -8,8 +8,8 @@ import (
 	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
 )
 
-func builtinLambert(args ...tengo.Object) (ret tengo.Object, err error) {
-	// Lambert takes one argument, a color
+func builtinDiffuse(args ...tengo.Object) (ret tengo.Object, err error) {
+	// Diffuse takes one argument, a color
 	if len(args) != 1 {
 		return nil, tengo.ErrWrongNumArguments
 	}
@@ -23,12 +23,12 @@ func builtinLambert(args ...tengo.Object) (ret tengo.Object, err error) {
 		}
 	}
 
-	return &Material{Material: messages.MaterialFrom(messages.Lambert{
+	return &Material{Material: messages.MaterialFrom(messages.Diffuse{
 		Albedo: albedo.Value,
 	})}, nil
 }
 
-func builtinMetal(args ...tengo.Object) (ret tengo.Object, err error) {
+func builtinMetallic(args ...tengo.Object) (ret tengo.Object, err error) {
 	// Metal takes two arguments, a color and a scatter
 	if len(args) != 2 {
 		return nil, tengo.ErrWrongNumArguments
@@ -52,7 +52,7 @@ func builtinMetal(args ...tengo.Object) (ret tengo.Object, err error) {
 		}
 	}
 
-	return &Material{Material: messages.MaterialFrom(messages.Metal{
+	return &Material{Material: messages.MaterialFrom(messages.Metallic{
 		Albedo:  albedo.Value,
 		Scatter: scatter,
 	})}, nil
@@ -77,7 +77,7 @@ func builtinDielectric(args ...tengo.Object) (ret tengo.Object, err error) {
 		IndexOfRefraction: ior,
 	})}, nil
 }
-	
+
 type Material struct {
 	tengo.ObjectImpl
 	messages.Material

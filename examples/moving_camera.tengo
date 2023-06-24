@@ -31,17 +31,17 @@ export scene(config, func(frame, seconds) {
 
     object(
         sphere(vec3(-sphere_distance, 1, 0), 1),
-        lambert(color(102, 51, 25))
+        diffuse(color(102, 51, 25))
     )
 
     object(
         sphere(vec3(sphere_distance, 1, 0), 1),
-        metal(color(178, 153, 127), 0.0)
+        metallic(color(178, 153, 127), 0.0)
     )
 
     // Ground sphere
     object(
         sphere(vec3(0, -1000, 0), 1000),
-        lambert(color(127, 127, 127))
+        diffuse(color(127, 127, 127))
     )
 })

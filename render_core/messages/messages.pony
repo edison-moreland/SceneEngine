@@ -417,7 +417,7 @@ primitive UnmarshalMsgPackPixel
         x',
         y'
         )
-class val Lambert is MsgPackMarshalable
+class val Diffuse is MsgPackMarshalable
     var albedo: Color
 
     new val create(
@@ -433,8 +433,8 @@ class val Lambert is MsgPackMarshalable
         MessagePackEncoder.fixstr(w, "Albedo")?
         albedo.marshal_msgpack(w)?
 
-primitive UnmarshalMsgPackLambert
-    fun apply(r: Reader ref): Lambert =>
+primitive UnmarshalMsgPackDiffuse
+    fun apply(r: Reader ref): Diffuse =>
         var albedo': Color = Color.zero()
 
         try
@@ -456,10 +456,10 @@ primitive UnmarshalMsgPackLambert
             Debug("Error unmarshalling" where stream = DebugErr)
         end
 
-        Lambert(
+        Diffuse(
         albedo'
         )
-class val Metal is MsgPackMarshalable
+class val Metallic is MsgPackMarshalable
     var albedo: Color
     var scatter: F64
 
@@ -481,8 +481,8 @@ class val Metal is MsgPackMarshalable
         MessagePackEncoder.fixstr(w, "Scatter")?
         MessagePackEncoder.float_64(w, scatter)
 
-primitive UnmarshalMsgPackMetal
-    fun apply(r: Reader ref): Metal =>
+primitive UnmarshalMsgPackMetallic
+    fun apply(r: Reader ref): Metallic =>
         var albedo': Color = Color.zero()
         var scatter': F64 = 0.0
 
@@ -507,7 +507,7 @@ primitive UnmarshalMsgPackMetal
             Debug("Error unmarshalling" where stream = DebugErr)
         end
 
-        Metal(
+        Metallic(
         albedo',
         scatter'
         )
@@ -555,15 +555,15 @@ primitive UnmarshalMsgPackDielectric
         )
 class val Material is MsgPackMarshalable
     var one_of: (
-        Lambert |
-        Metal |
+        Diffuse |
+        Metallic |
         Dielectric 
     )
 
     new val create(
         one_of': (
-            Lambert |
-            Metal |
+            Diffuse |
+            Metallic |
             Dielectric 
             )
         ) =>
@@ -571,14 +571,14 @@ class val Material is MsgPackMarshalable
         one_of = one_of'
 
     new val zero() =>
-        one_of = Lambert.zero()
+        one_of = Diffuse.zero()
 
     fun marshal_msgpack(w: Writer ref)? =>
         match one_of
-        | let o: Lambert =>
+        | let o: Diffuse =>
             MessagePackEncoder.uint_8(w, 0)
             o.marshal_msgpack(w)?
-        | let o: Metal =>
+        | let o: Metallic =>
             MessagePackEncoder.uint_8(w, 1)
             o.marshal_msgpack(w)?
         | let o: Dielectric =>
@@ -591,12 +591,12 @@ primitive UnmarshalMsgPackMaterial
         try
 
         Material(match MessagePackDecoder.u8(r)?
-        | 0 => UnmarshalMsgPackLambert(r)
-        | 1 => UnmarshalMsgPackMetal(r)
+        | 0 => UnmarshalMsgPackDiffuse(r)
+        | 1 => UnmarshalMsgPackMetallic(r)
         | 2 => UnmarshalMsgPackDielectric(r)
         else
             Debug("broken oneof" where stream = DebugErr)
-            Lambert.zero()
+            Diffuse.zero()
         end)
 
         else

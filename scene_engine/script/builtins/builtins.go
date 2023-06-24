@@ -12,8 +12,8 @@ var SceneEngineBuiltins = []*tengo.BuiltinFunction{
 	// Shapes
 	{Name: "sphere", Value: builtinSphere},
 	// Materials
-	{Name: "lambert", Value: builtinLambert},
-	{Name: "metal", Value: builtinMetal},
+	{Name: "diffuse", Value: builtinDiffuse},
+	{Name: "metallic", Value: builtinMetallic},
 	{Name: "dielectric", Value: builtinDielectric},
 	// Rand
 	{Name: "rand_color", Value: builtinRandColor},
