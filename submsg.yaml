@@ -38,15 +38,32 @@ types:
       y: Uint
       color: color
 
+  - name: uniform
+    type: struct
+    fields:
+      color: color
+
+  - name: checker
+    type: struct
+    fields:
+      even: texture
+      odd: texture
+
+  - name: texture
+    type: one_of
+    members:
+      - uniform
+      - checker
+
   - name: diffuse
     type: struct
     fields:
-      albedo: color
+      texture: texture
 
   - name: metallic
     type: struct
     fields:
-      albedo: color
+      texture: texture
       scatter: Float
 
   - name: dielectric
@@ -86,6 +103,7 @@ types:
       fov: Float
       aperture: Float
 
+#  TODO: Add "material index", so materials don't have to be repeated over and over
   - name: scene
     type: struct
     fields:

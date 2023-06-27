@@ -184,8 +184,16 @@ func PreviewPhase(script *FileWatcher, sceneCache *script.SceneCache) AppPhase {
 	}
 }
 
-func (p *preview) colorToColor(c messages.Color) rl.Color {
-	return rl.NewColor(c.R, c.G, c.B, 255)
+func (p *preview) textureColor(t messages.Texture) rl.Color {
+	// TODO: use actual textures
+	switch t := t.OneOf.(type) {
+	case messages.Uniform:
+		c := t.Color
+		return rl.NewColor(c.R, c.G, c.B, 255)
+	case messages.Checker:
+		return p.textureColor(t.Even)
+	}
+	panic("Texture not implemented " + fmt.Sprintf("%#v", t))
 }
 
 func (p *preview) positionToVec3(pos messages.Position) rl.Vector3 {
@@ -207,9 +215,9 @@ func (p *preview) drawScenePreview() {
 		objectColor := rl.Gray
 		switch m := object.Material.OneOf.(type) {
 		case messages.Diffuse:
-			objectColor = p.colorToColor(m.Albedo)
+			objectColor = p.textureColor(m.Texture)
 		case messages.Metallic:
-			objectColor = p.colorToColor(m.Albedo)
+			objectColor = p.textureColor(m.Texture)
 
 			// Dielectric gets default color
 		}

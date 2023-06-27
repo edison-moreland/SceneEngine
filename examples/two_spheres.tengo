@@ -1,0 +1,17 @@
+config := {
+    aspect_ratio: 1.0,
+    image_width: 600,
+    samples: 100,
+    depth: 50
+}
+
+export scene(config, func(frame, seconds) {
+    camera(vec3(13, 2, 3), vec3(0, 0, 0), 20, 0.0)
+
+    tex := checker(color(51, 77, 26),
+                           color(230, 230, 230))
+
+    object(sphere(vec3(0, -10, 0), 10), diffuse(tex))
+    object(sphere(vec3(0, 10, 0), 10), diffuse(tex))
+
+})

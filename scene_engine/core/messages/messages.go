@@ -7,50 +7,6 @@ import (
 )
 
 const (
-	CoreMsgInfo        submsg.MsgId = 0
-	CoreMsgConfig      submsg.MsgId = 1
-	CoreMsgRenderFrame submsg.MsgId = 2
-)
-
-type CoreServer interface {
-	Info(body []byte) error
-	Config(body []byte) error
-	RenderFrame(body []byte) error
-}
-
-func CoreRouter(s CoreServer) submsg.MsgReceiver {
-	return func(id submsg.MsgId, body []byte) error {
-		switch id {
-		case CoreMsgInfo:
-			return s.Info(body)
-		case CoreMsgConfig:
-			return s.Config(body)
-		case CoreMsgRenderFrame:
-			return s.RenderFrame(body)
-		default:
-			return submsg.ErrMsgIdUnknown
-		}
-	}
-}
-
-type CoreClient struct {
-	s submsg.MsgSender
-}
-
-func NewCoreClient(s submsg.MsgSender) *CoreClient {
-	return &CoreClient{s: s}
-}
-func (c *CoreClient) Info(b []byte) {
-	c.s(CoreMsgInfo, b)
-}
-func (c *CoreClient) Config(b []byte) {
-	c.s(CoreMsgConfig, b)
-}
-func (c *CoreClient) RenderFrame(b []byte) {
-	c.s(CoreMsgRenderFrame, b)
-}
-
-const (
 	EngineMsgCoreReady  submsg.MsgId = 0
 	EngineMsgCoreInfo   submsg.MsgId = 1
 	EngineMsgPixelBatch submsg.MsgId = 2
@@ -94,6 +50,50 @@ func (c *EngineClient) PixelBatch(b []byte) {
 	c.s(EngineMsgPixelBatch, b)
 }
 
+const (
+	CoreMsgInfo        submsg.MsgId = 0
+	CoreMsgConfig      submsg.MsgId = 1
+	CoreMsgRenderFrame submsg.MsgId = 2
+)
+
+type CoreServer interface {
+	Info(body []byte) error
+	Config(body []byte) error
+	RenderFrame(body []byte) error
+}
+
+func CoreRouter(s CoreServer) submsg.MsgReceiver {
+	return func(id submsg.MsgId, body []byte) error {
+		switch id {
+		case CoreMsgInfo:
+			return s.Info(body)
+		case CoreMsgConfig:
+			return s.Config(body)
+		case CoreMsgRenderFrame:
+			return s.RenderFrame(body)
+		default:
+			return submsg.ErrMsgIdUnknown
+		}
+	}
+}
+
+type CoreClient struct {
+	s submsg.MsgSender
+}
+
+func NewCoreClient(s submsg.MsgSender) *CoreClient {
+	return &CoreClient{s: s}
+}
+func (c *CoreClient) Info(b []byte) {
+	c.s(CoreMsgInfo, b)
+}
+func (c *CoreClient) Config(b []byte) {
+	c.s(CoreMsgConfig, b)
+}
+func (c *CoreClient) RenderFrame(b []byte) {
+	c.s(CoreMsgRenderFrame, b)
+}
+
 type MsgCoreInfo struct {
 	Version string
 }
@@ -122,12 +122,61 @@ type Pixel struct {
 	X     uint64
 	Y     uint64
 }
+type Uniform struct {
+	Color Color
+}
+type Checker struct {
+	Even Texture
+	Odd  Texture
+}
+type Texture struct {
+	OneOf any
+}
+
+func TextureFrom[T Uniform | Checker](v T) Texture {
+	return Texture{OneOf: v}
+}
+func (o Texture) EncodeMsgpack(e *v5.Encoder) error {
+	var err error
+	switch o.OneOf.(type) {
+	case Uniform:
+		err = e.EncodeUint8(0)
+	case Checker:
+		err = e.EncodeUint8(1)
+	default:
+		err = submsg.ErrUnknownOneOfField
+	}
+	if err != nil {
+		return err
+	}
+	return e.Encode(o.OneOf)
+}
+func (o Texture) DecodeMsgpack(d *v5.Decoder) error {
+	t, err := d.DecodeUint8()
+	if err != nil {
+		return err
+	}
+	switch t {
+	case 0:
+		var v Uniform
+		err = d.Decode(&v)
+		o.OneOf = v
+	case 1:
+		var v Checker
+		err = d.Decode(&v)
+		o.OneOf = v
+	default:
+		err = submsg.ErrUnknownOneOfField
+	}
+	return err
+}
+
 type Diffuse struct {
-	Albedo Color
+	Texture Texture
 }
 type Metallic struct {
-	Albedo  Color
 	Scatter float64
+	Texture Texture
 }
 type Dielectric struct {
 	IndexOfRefraction float64
@@ -139,7 +188,7 @@ type Material struct {
 func MaterialFrom[T Diffuse | Metallic | Dielectric](v T) Material {
 	return Material{OneOf: v}
 }
-func (o *Material) EncodeMsgpack(e *v5.Encoder) error {
+func (o Material) EncodeMsgpack(e *v5.Encoder) error {
 	var err error
 	switch o.OneOf.(type) {
 	case Diffuse:
@@ -156,7 +205,7 @@ func (o *Material) EncodeMsgpack(e *v5.Encoder) error {
 	}
 	return e.Encode(o.OneOf)
 }
-func (o *Material) DecodeMsgpack(d *v5.Decoder) error {
+func (o Material) DecodeMsgpack(d *v5.Decoder) error {
 	t, err := d.DecodeUint8()
 	if err != nil {
 		return err
@@ -191,7 +240,7 @@ type Shape struct {
 func ShapeFrom[T Sphere](v T) Shape {
 	return Shape{OneOf: v}
 }
-func (o *Shape) EncodeMsgpack(e *v5.Encoder) error {
+func (o Shape) EncodeMsgpack(e *v5.Encoder) error {
 	var err error
 	switch o.OneOf.(type) {
 	case Sphere:
@@ -204,7 +253,7 @@ func (o *Shape) EncodeMsgpack(e *v5.Encoder) error {
 	}
 	return e.Encode(o.OneOf)
 }
-func (o *Shape) DecodeMsgpack(d *v5.Decoder) error {
+func (o Shape) DecodeMsgpack(d *v5.Decoder) error {
 	t, err := d.DecodeUint8()
 	if err != nil {
 		return err

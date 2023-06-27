@@ -82,11 +82,16 @@ class val HitRecord
     let front_face: Bool
     let p: Point3
     let t: F64
+    // Texture coords
+    let u: F64
+    let v: F64
 
-    new val create(normal': Vec3, p': Point3, t': F64, material': Material) =>
+    new val create(normal': Vec3, p': Point3, t': F64, u': F64, v': F64, material': Material) =>
         normal = normal'
         p = p'
         t = t'
+        u = u'
+        v = v'
         front_face = false
         material = material'
 
@@ -95,11 +100,15 @@ class val HitRecord
         front_face = false
         p = Vec3.zero()
         t = 0
-        material = Diffuse(Vec3.zero())
+        u = 0
+        v = 0
+        material = Diffuse(Uniform(Vec3.zero()))
 
-    new val from_ray(r: Ray, outward_normal: Vec3,  t': F64, p': Vec3, material': Material) =>
+    new val from_ray(r: Ray, outward_normal: Vec3,  t': F64, p': Vec3, u': F64, v': F64, material': Material) =>
         t = t'
         p = p'
+        u = u'
+        v = v'
         material = material'
 
         front_face = r.direction.dot(outward_normal) < 0
@@ -157,6 +166,15 @@ class HitShape is ShapeVisitor[(HitRecord | None)]
             if ri.t < le.t then ri else le end
         end
 
+    fun sphere_uv(p: Vec3): (F64, F64) =>
+        let theta = (-p.y).acos()
+        let phi = (-p.z).atan2(p.x) + F64.pi()
+
+        (
+            phi / (2 * F64.pi()),
+            theta / F64.pi()
+        )
+
     fun visit_sphere(s: Sphere box): (HitRecord | None) =>
         let oc = r.origin - s.origin
 
@@ -182,7 +200,8 @@ class HitShape is ShapeVisitor[(HitRecord | None)]
         end
 
         let p = r.at(root)
-        HitRecord.from_ray(r, (p - s.origin) / s.radius, root, p, s.material)
+        (let u, let v) = sphere_uv(p)
+        HitRecord.from_ray(r, (p - s.origin) / s.radius, root, p, u, v, s.material)
 
 class val ScatterMaterial is MaterialVisitor[((Vec3, Ray) | None)] // (color, attenuation)
     let _rand: Rand ref
@@ -206,7 +225,7 @@ class val ScatterMaterial is MaterialVisitor[((Vec3, Ray) | None)] // (color, at
         end
 
         (
-            d.albedo,
+            QueryTexture(rec.u, rec.v, rec.p)(d.texture),
             Ray(rec.p, scatter_direction)
         )
 
@@ -214,7 +233,7 @@ class val ScatterMaterial is MaterialVisitor[((Vec3, Ray) | None)] // (color, at
         let reflected = ray_in.direction.unit().reflect(rec.normal)
 
         (
-            m.albedo,
+            QueryTexture(rec.u, rec.v, rec.p)(m.texture),
             Ray(rec.p, reflected)
         )
 
@@ -248,3 +267,27 @@ class val ScatterMaterial is MaterialVisitor[((Vec3, Ray) | None)] // (color, at
             Vec3.one(),
             Ray(rec.p, direction)
         )
+
+class val QueryTexture is TextureVisitor[Vec3]
+    let u: F64
+    let v: F64
+    let p: Vec3
+
+    new create(u': F64, v': F64, p': Vec3) =>
+        u = u'
+        v = v'
+        p = p'
+
+    fun ref apply(t: Texture): Vec3 =>
+        t.accept[Vec3](this)
+
+    fun ref visit_uniform(n: Uniform box): Vec3 =>
+        n.color
+
+    fun ref visit_checker(c: Checker box): Vec3 =>
+        let sines = (10*p.x).sin() * (10*p.y).sin() * (10*p.z).sin()
+        if sines < 0 then
+            this(c.odd)
+        else
+            this(c.even)
+        end

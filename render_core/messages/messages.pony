@@ -417,33 +417,171 @@ primitive UnmarshalMsgPackPixel
         x',
         y'
         )
-class val Diffuse is MsgPackMarshalable
-    var albedo: Color
+class val Uniform is MsgPackMarshalable
+    var color: Color
 
     new val create(
-        albedo': Color
+        color': Color
         ) =>
-        albedo = albedo'
+        color = color'
 
     new val zero() =>
-        albedo = Color.zero()
+        color = Color.zero()
 
     fun marshal_msgpack(w: Writer ref)? =>
         MessagePackEncoder.fixmap(w, 1)?
-        MessagePackEncoder.fixstr(w, "Albedo")?
-        albedo.marshal_msgpack(w)?
+        MessagePackEncoder.fixstr(w, "Color")?
+        color.marshal_msgpack(w)?
 
-primitive UnmarshalMsgPackDiffuse
-    fun apply(r: Reader ref): Diffuse =>
-        var albedo': Color = Color.zero()
+primitive UnmarshalMsgPackUniform
+    fun apply(r: Reader ref): Uniform =>
+        var color': Color = Color.zero()
 
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
                 let field_name = MessagePackDecoder.fixstr(r)?
                 match field_name
-                | "Albedo" =>
-                    albedo' = UnmarshalMsgPackColor(r)
+                | "Color" =>
+                    color' = UnmarshalMsgPackColor(r)
+                else
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        Uniform(
+        color'
+        )
+class val Checker is MsgPackMarshalable
+    var even: Texture
+    var odd: Texture
+
+    new val create(
+        even': Texture,
+        odd': Texture
+        ) =>
+        even = even'
+        odd = odd'
+
+    new val zero() =>
+        even = Texture.zero()
+        odd = Texture.zero()
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 2)?
+        MessagePackEncoder.fixstr(w, "Even")?
+        even.marshal_msgpack(w)?
+        MessagePackEncoder.fixstr(w, "Odd")?
+        odd.marshal_msgpack(w)?
+
+primitive UnmarshalMsgPackChecker
+    fun apply(r: Reader ref): Checker =>
+        var even': Texture = Texture.zero()
+        var odd': Texture = Texture.zero()
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
+                | "Even" =>
+                    even' = UnmarshalMsgPackTexture(r)
+                | "Odd" =>
+                    odd' = UnmarshalMsgPackTexture(r)
+                else
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        Checker(
+        even',
+        odd'
+        )
+class val Texture is MsgPackMarshalable
+    var one_of: (
+        Uniform |
+        Checker 
+    )
+
+    new val create(
+        one_of': (
+            Uniform |
+            Checker 
+            )
+        ) =>
+
+        one_of = one_of'
+
+    new val zero() =>
+        one_of = Uniform.zero()
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        match one_of
+        | let o: Uniform =>
+            MessagePackEncoder.uint_8(w, 0)
+            o.marshal_msgpack(w)?
+        | let o: Checker =>
+            MessagePackEncoder.uint_8(w, 1)
+            o.marshal_msgpack(w)?
+        end
+
+primitive UnmarshalMsgPackTexture
+    fun apply(r: Reader ref): Texture =>
+        try
+
+        Texture(match MessagePackDecoder.u8(r)?
+        | 0 => UnmarshalMsgPackUniform(r)
+        | 1 => UnmarshalMsgPackChecker(r)
+        else
+            Debug("broken oneof" where stream = DebugErr)
+            Uniform.zero()
+        end)
+
+        else
+            Debug("broken oneof 2" where stream = DebugErr)
+            Texture.zero()
+        end
+class val Diffuse is MsgPackMarshalable
+    var texture: Texture
+
+    new val create(
+        texture': Texture
+        ) =>
+        texture = texture'
+
+    new val zero() =>
+        texture = Texture.zero()
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 1)?
+        MessagePackEncoder.fixstr(w, "Texture")?
+        texture.marshal_msgpack(w)?
+
+primitive UnmarshalMsgPackDiffuse
+    fun apply(r: Reader ref): Diffuse =>
+        var texture': Texture = Texture.zero()
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
+                | "Texture" =>
+                    texture' = UnmarshalMsgPackTexture(r)
                 else
                     var error_message = String()
                     error_message.append("unknown field: ")
@@ -457,44 +595,44 @@ primitive UnmarshalMsgPackDiffuse
         end
 
         Diffuse(
-        albedo'
+        texture'
         )
 class val Metallic is MsgPackMarshalable
-    var albedo: Color
     var scatter: F64
+    var texture: Texture
 
     new val create(
-        albedo': Color,
-        scatter': F64
+        scatter': F64,
+        texture': Texture
         ) =>
-        albedo = albedo'
         scatter = scatter'
+        texture = texture'
 
     new val zero() =>
-        albedo = Color.zero()
         scatter = 0.0
+        texture = Texture.zero()
 
     fun marshal_msgpack(w: Writer ref)? =>
         MessagePackEncoder.fixmap(w, 2)?
-        MessagePackEncoder.fixstr(w, "Albedo")?
-        albedo.marshal_msgpack(w)?
         MessagePackEncoder.fixstr(w, "Scatter")?
         MessagePackEncoder.float_64(w, scatter)
+        MessagePackEncoder.fixstr(w, "Texture")?
+        texture.marshal_msgpack(w)?
 
 primitive UnmarshalMsgPackMetallic
     fun apply(r: Reader ref): Metallic =>
-        var albedo': Color = Color.zero()
         var scatter': F64 = 0.0
+        var texture': Texture = Texture.zero()
 
         try
             let map_size = Unmarshal.map(r)?
             for i in Range(0, map_size) do
                 let field_name = MessagePackDecoder.fixstr(r)?
                 match field_name
-                | "Albedo" =>
-                    albedo' = UnmarshalMsgPackColor(r)
                 | "Scatter" =>
                     scatter' = MessagePackDecoder.f64(r)?
+                | "Texture" =>
+                    texture' = UnmarshalMsgPackTexture(r)
                 else
                     var error_message = String()
                     error_message.append("unknown field: ")
@@ -508,8 +646,8 @@ primitive UnmarshalMsgPackMetallic
         end
 
         Metallic(
-        albedo',
-        scatter'
+        scatter',
+        texture'
         )
 class val Dielectric is MsgPackMarshalable
     var index_of_refraction: F64

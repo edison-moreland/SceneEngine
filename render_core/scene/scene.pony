@@ -104,16 +104,29 @@ primitive Transform
         match material.one_of
         | let l: messages.Diffuse =>
             Diffuse(where
-                albedo' = transform_color(l.albedo)
+                texture' = transform_texture(l.texture)
             )
         | let m: messages.Metallic =>
             Metallic(where
-                albedo' = transform_color(m.albedo),
+                texture' = transform_texture(m.texture),
                 scatter' = m.scatter
             )
         | let d: messages.Dielectric =>
             Dielectric(where
                 ior = d.index_of_refraction
+            )
+        end
+
+    fun transform_texture(texture: messages.Texture): Texture =>
+        match texture.one_of
+        | let u: messages.Uniform =>
+            Uniform(where
+                color' = transform_color(u.color)
+            )
+        | let c: messages.Checker =>
+            Checker(where
+                even' = transform_texture(c.even),
+                odd' = transform_texture(c.odd)
             )
         end
 

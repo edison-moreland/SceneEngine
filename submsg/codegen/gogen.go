@@ -153,7 +153,6 @@ func (g *goGen) emitOneOf(t TypeDesc) {
 	g.j.Func().
 		Params(
 			jen.Id("o").
-				Op("*").
 				Id(oneOfIdent)).
 		Id("EncodeMsgpack").
 		Params(
@@ -198,7 +197,6 @@ func (g *goGen) emitOneOf(t TypeDesc) {
 	g.j.Func().
 		Params(
 			jen.Id("o").
-				Op("*").
 				Id(oneOfIdent)).
 		Id("DecodeMsgpack").
 		Params(

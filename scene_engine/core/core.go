@@ -127,7 +127,7 @@ func (r *RenderCore) StartRender(scene messages.Scene) <-chan []messages.Pixel {
 	}
 	r.pixelsOut = make(chan []messages.Pixel)
 
-	body, err := msgpack.Marshal(scene)
+	body, err := msgpack.Marshal(&scene)
 	if err != nil {
 		panic(err)
 	}

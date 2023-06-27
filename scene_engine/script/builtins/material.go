@@ -9,51 +9,39 @@ import (
 )
 
 func builtinDiffuse(args ...tengo.Object) (ret tengo.Object, err error) {
-	// Diffuse takes one argument, a color
+	// Diffuse takes one argument, a texture
 	if len(args) != 1 {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	albedo, ok := args[0].(*Color)
-	if !ok {
-		return nil, tengo.ErrInvalidArgumentType{
-			Name:     "albedo",
-			Expected: "Color",
-			Found:    args[0].TypeName(),
-		}
+	texture, err := getArg(ToTexture, args, 0, "texture")
+	if err != nil {
+		return nil, err
 	}
 
 	return &Material{Material: messages.MaterialFrom(messages.Diffuse{
-		Albedo: albedo.Value,
+		Texture: texture,
 	})}, nil
 }
 
 func builtinMetallic(args ...tengo.Object) (ret tengo.Object, err error) {
-	// Metal takes two arguments, a color and a scatter
+	// Metal takes two arguments, a texture and a scatter
 	if len(args) != 2 {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	albedo, ok := args[0].(*Color)
-	if !ok {
-		return nil, tengo.ErrInvalidArgumentType{
-			Name:     "albedo",
-			Expected: "Color",
-			Found:    args[0].TypeName(),
-		}
+	texture, err := getArg(ToTexture, args, 0, "texture")
+	if err != nil {
+		return nil, err
 	}
 
-	scatter, ok := tengo.ToFloat64(args[1])
-	if !ok {
-		return nil, tengo.ErrInvalidArgumentType{
-			Name:     "scatter",
-			Expected: "Float",
-			Found:    args[0].TypeName(),
-		}
+	scatter, err := getArg(tengo.ToFloat64, args, 1, "scatter")
+	if err != nil {
+		return nil, err
 	}
 
 	return &Material{Material: messages.MaterialFrom(messages.Metallic{
-		Albedo:  albedo.Value,
+		Texture: texture,
 		Scatter: scatter,
 	})}, nil
 }
@@ -64,18 +52,23 @@ func builtinDielectric(args ...tengo.Object) (ret tengo.Object, err error) {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	ior, ok := tengo.ToFloat64(args[0])
-	if !ok {
-		return nil, tengo.ErrInvalidArgumentType{
-			Name:     "ior",
-			Expected: "Float",
-			Found:    args[0].TypeName(),
-		}
+	ior, err := getArg(tengo.ToFloat64, args, 0, "ior")
+	if err != nil {
+		return nil, err
 	}
 
 	return &Material{Material: messages.MaterialFrom(messages.Dielectric{
 		IndexOfRefraction: ior,
 	})}, nil
+}
+
+func ToMaterial(o tengo.Object) (messages.Material, bool) {
+	switch o := o.(type) {
+	case *Material:
+		return o.Material, true
+	}
+
+	return messages.Material{}, false
 }
 
 type Material struct {
