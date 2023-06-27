@@ -14,20 +14,29 @@ func builtinSphere(args ...tengo.Object) (ret tengo.Object, err error) {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	origin, ok := args[0].(*Vec3)
-	if !ok {
-		return nil, tengo.ErrInvalidArgumentType{Name: "origin"}
+	origin, err := getArg(ToPosition, args, 0, "origin")
+	if err != nil {
+		return nil, err
 	}
 
-	radius, ok := tengo.ToFloat64(args[1])
-	if !ok {
-		return nil, tengo.ErrInvalidArgumentType{Name: "radius"}
+	radius, err := getArg(tengo.ToFloat64, args, 1, "radius")
+	if err != nil {
+		return nil, err
 	}
 
 	return &Shape{Shape: messages.ShapeFrom(messages.Sphere{
-		Origin: origin.Position(),
+		Origin: origin,
 		Radius: radius,
 	})}, nil
+}
+
+func ToShape(o tengo.Object) (messages.Shape, bool) {
+	switch o := o.(type) {
+	case *Shape:
+		return o.Shape, true
+	}
+
+	return messages.Shape{}, false
 }
 
 type Shape struct {

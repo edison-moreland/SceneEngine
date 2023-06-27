@@ -4,6 +4,18 @@ import (
 	"github.com/d5/tengo/v2"
 )
 
+func getArg[T any](toT func(object tengo.Object) (T, bool), args []tengo.Object, idx int, name string) (T, error) {
+	arg, ok := toT(args[idx])
+	if !ok {
+		return arg, tengo.ErrInvalidArgumentType{
+			Name:  name,
+			Found: args[idx].TypeName(),
+		}
+	}
+
+	return arg, nil
+}
+
 var SceneEngineBuiltins = []*tengo.BuiltinFunction{
 	// Vec3
 	{Name: "vec3", Value: builtinVec3},
@@ -15,6 +27,9 @@ var SceneEngineBuiltins = []*tengo.BuiltinFunction{
 	{Name: "diffuse", Value: builtinDiffuse},
 	{Name: "metallic", Value: builtinMetallic},
 	{Name: "dielectric", Value: builtinDielectric},
+	// Textures
+	{Name: "uniform", Value: builtinUniform},
+	{Name: "checker", Value: builtinChecker},
 	// Rand
 	{Name: "rand_color", Value: builtinRandColor},
 	{Name: "rand_vec3", Value: builtinRandVec3},

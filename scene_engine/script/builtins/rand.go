@@ -28,9 +28,10 @@ func builtinRandColor(args ...tengo.Object) (ret tengo.Object, err error) {
 	saturation := float32(0.5)
 	switch len(args) {
 	case 1:
-		newSaturation, ok := tengo.ToFloat64(args[0])
-		if !ok {
-			return nil, tengo.ErrInvalidArgumentType{Name: "saturation"}
+
+		newSaturation, err := getArg(tengo.ToFloat64, args, 0, "saturation")
+		if err != nil {
+			return nil, err
 		}
 		saturation = float32(newSaturation)
 	case 0:
@@ -74,9 +75,9 @@ func builtinRandChoice(args ...tengo.Object) (ret tengo.Object, err error) {
 			return nil, tengo.ErrWrongNumArguments
 		}
 
-		weight, ok := tengo.ToFloat64(argArr.Value[0])
-		if !ok {
-			return nil, tengo.ErrInvalidArgumentType{Name: fmt.Sprintf("args[%d].weight", i)}
+		weight, err := getArg(tengo.ToFloat64, argArr.Value, 0, fmt.Sprintf("args[%d].weight", i))
+		if err != nil {
+			return nil, err
 		}
 
 		totalWeight += weight

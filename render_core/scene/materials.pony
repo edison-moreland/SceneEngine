@@ -9,20 +9,20 @@ interface val Material
     fun accept[T: Any](m: MaterialVisitor[T] ref): T
 
 class val Diffuse is Material
-    let albedo: Vec3
+    let texture: Texture
 
-    new val create(albedo': Vec3) =>
-        albedo = albedo'
+    new val create(texture': Texture) =>
+        texture = texture'
 
     fun accept[T: Any](m: MaterialVisitor[T] ref): T =>
         m.visit_diffuse(this)
 
 class val Metallic is Material
-    let albedo: Vec3
+    let texture: Texture
     let scatter: F64
 
-    new val create(albedo': Vec3, scatter': F64) =>
-        albedo = albedo'
+    new val create(texture': Texture, scatter': F64) =>
+        texture = texture'
         scatter = scatter'
 
     fun accept[T: Any](m: MaterialVisitor[T] ref): T =>

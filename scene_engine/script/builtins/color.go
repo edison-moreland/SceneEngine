@@ -13,19 +13,19 @@ func builtinColor(args ...tengo.Object) (ret tengo.Object, err error) {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	r, ok := tengo.ToInt(args[0])
-	if !ok {
-		return nil, tengo.ErrInvalidArgumentType{Name: "R"}
+	r, err := getArg(tengo.ToInt, args, 0, "R")
+	if err != nil {
+		return nil, err
 	}
 
-	g, ok := tengo.ToInt(args[1])
-	if !ok {
-		return nil, tengo.ErrInvalidArgumentType{Name: "G"}
+	g, err := getArg(tengo.ToInt, args, 1, "G")
+	if err != nil {
+		return nil, err
 	}
 
-	b, ok := tengo.ToInt(args[2])
-	if !ok {
-		return nil, tengo.ErrInvalidArgumentType{Name: "B"}
+	b, err := getArg(tengo.ToInt, args, 2, "B")
+	if err != nil {
+		return nil, err
 	}
 
 	return &Color{Value: messages.Color{
@@ -67,6 +67,16 @@ func builtinColor(args ...tengo.Object) (ret tengo.Object, err error) {
 //		return &Color{Value: messages.Color{R: 255, G: 255, B: 255}}, nil
 //	}},
 //}
+
+func ToColor(o tengo.Object) (messages.Color, bool) {
+	switch o := o.(type) {
+	case *Color:
+		return o.Value, true
+		// TODO: Add case for vec3?
+	}
+
+	return messages.Color{}, false
+}
 
 type Color struct {
 	tengo.ObjectImpl

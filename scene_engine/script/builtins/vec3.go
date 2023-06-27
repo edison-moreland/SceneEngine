@@ -15,19 +15,19 @@ func builtinVec3(args ...tengo.Object) (ret tengo.Object, err error) {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	x, ok := tengo.ToFloat64(args[0])
-	if !ok {
-		return nil, tengo.ErrInvalidArgumentType{Name: "X"}
+	x, err := getArg(tengo.ToFloat64, args, 0, "X")
+	if err != nil {
+		return nil, err
 	}
 
-	y, ok := tengo.ToFloat64(args[1])
-	if !ok {
-		return nil, tengo.ErrInvalidArgumentType{Name: "Y"}
+	y, err := getArg(tengo.ToFloat64, args, 1, "Y")
+	if err != nil {
+		return nil, err
 	}
 
-	z, ok := tengo.ToFloat64(args[2])
-	if !ok {
-		return nil, tengo.ErrInvalidArgumentType{Name: "Z"}
+	z, err := getArg(tengo.ToFloat64, args, 2, "Z")
+	if err != nil {
+		return nil, err
 	}
 
 	return newVec3(rl.NewVector3(
@@ -35,6 +35,24 @@ func builtinVec3(args ...tengo.Object) (ret tengo.Object, err error) {
 		float32(y),
 		float32(z),
 	)), nil
+}
+
+func ToVector3(o tengo.Object) (rl.Vector3, bool) {
+	switch o := o.(type) {
+	case *Vec3:
+		return o.Value, true
+	}
+
+	return rl.Vector3{}, false
+}
+
+func ToPosition(o tengo.Object) (messages.Position, bool) {
+	switch o := o.(type) {
+	case *Vec3:
+		return o.Position(), true
+	}
+
+	return messages.Position{}, false
 }
 
 // Vec3 is a tengo vector
