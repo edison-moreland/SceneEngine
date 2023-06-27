@@ -14,12 +14,12 @@ func builtinSphere(args ...tengo.Object) (ret tengo.Object, err error) {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	origin, err := getArg(ToPosition, args, 0, "origin")
+	origin, err := GetArg(ToPosition, args, 0, "origin")
 	if err != nil {
 		return nil, err
 	}
 
-	radius, err := getArg(tengo.ToFloat64, args, 1, "radius")
+	radius, err := GetArg(tengo.ToFloat64, args, 1, "radius")
 	if err != nil {
 		return nil, err
 	}

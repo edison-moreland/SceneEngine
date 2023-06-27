@@ -14,7 +14,7 @@ func builtinDiffuse(args ...tengo.Object) (ret tengo.Object, err error) {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	texture, err := getArg(ToTexture, args, 0, "texture")
+	texture, err := GetArg(ToTexture, args, 0, "texture")
 	if err != nil {
 		return nil, err
 	}
@@ -30,12 +30,12 @@ func builtinMetallic(args ...tengo.Object) (ret tengo.Object, err error) {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	texture, err := getArg(ToTexture, args, 0, "texture")
+	texture, err := GetArg(ToTexture, args, 0, "texture")
 	if err != nil {
 		return nil, err
 	}
 
-	scatter, err := getArg(tengo.ToFloat64, args, 1, "scatter")
+	scatter, err := GetArg(tengo.ToFloat64, args, 1, "scatter")
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func builtinDielectric(args ...tengo.Object) (ret tengo.Object, err error) {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	ior, err := getArg(tengo.ToFloat64, args, 0, "ior")
+	ior, err := GetArg(tengo.ToFloat64, args, 0, "ior")
 	if err != nil {
 		return nil, err
 	}

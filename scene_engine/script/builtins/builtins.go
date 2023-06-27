@@ -4,7 +4,7 @@ import (
 	"github.com/d5/tengo/v2"
 )
 
-func getArg[T any](toT func(object tengo.Object) (T, bool), args []tengo.Object, idx int, name string) (T, error) {
+func GetArg[T any](toT func(object tengo.Object) (T, bool), args []tengo.Object, idx int, name string) (T, error) {
 	arg, ok := toT(args[idx])
 	if !ok {
 		return arg, tengo.ErrInvalidArgumentType{

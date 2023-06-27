@@ -13,7 +13,7 @@ func builtinUniform(args ...tengo.Object) (tengo.Object, error) {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	color, err := getArg(ToColor, args, 0, "color")
+	color, err := GetArg(ToColor, args, 0, "color")
 	if err != nil {
 		return nil, err
 	}
@@ -28,12 +28,12 @@ func builtinChecker(args ...tengo.Object) (tengo.Object, error) {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	even, err := getArg(ToTexture, args, 0, "even")
+	even, err := GetArg(ToTexture, args, 0, "even")
 	if err != nil {
 		return nil, err
 	}
 
-	odd, err := getArg(ToTexture, args, 1, "odd")
+	odd, err := GetArg(ToTexture, args, 1, "odd")
 	if err != nil {
 		return nil, err
 	}

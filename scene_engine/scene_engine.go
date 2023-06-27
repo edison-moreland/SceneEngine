@@ -17,6 +17,7 @@ import (
 	"github.com/edison-moreland/SceneEngine/scene_engine/core"
 	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
 	"github.com/edison-moreland/SceneEngine/scene_engine/layout"
+	"github.com/edison-moreland/SceneEngine/scene_engine/scenebuilder"
 	"github.com/edison-moreland/SceneEngine/scene_engine/script"
 )
 
@@ -63,7 +64,7 @@ func main() {
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(60)
 
-	var sceneCache script.SceneCache
+	var sceneCache scenebuilder.SceneCache
 	err = RunPhases(logger, LoadScript, map[AppPhaseId]AppPhase{
 		Preview:    PreviewPhase(scriptFileWatcher, &sceneCache),
 		LoadScript: LoadScriptPhase(&sceneCache, scriptPath),
@@ -169,11 +170,11 @@ type preview struct {
 	renderButton   Button
 	timelineSlider Slider
 
-	sceneCache   *script.SceneCache
+	sceneCache   *scenebuilder.SceneCache
 	currentScene uint64
 }
 
-func PreviewPhase(script *FileWatcher, sceneCache *script.SceneCache) AppPhase {
+func PreviewPhase(script *FileWatcher, sceneCache *scenebuilder.SceneCache) AppPhase {
 	return &preview{
 		script: script,
 
@@ -286,7 +287,7 @@ type render struct {
 
 	core       *core.RenderCore
 	target     *renderTarget
-	sceneCache *script.SceneCache
+	sceneCache *scenebuilder.SceneCache
 	exportPath string
 
 	renderActive bool
@@ -296,7 +297,7 @@ type render struct {
 	frameElapsed   rollingAverage
 }
 
-func RenderPhase(logger *zap.Logger, core *core.RenderCore, sceneCache *script.SceneCache, exportDir string) AppPhase {
+func RenderPhase(logger *zap.Logger, core *core.RenderCore, sceneCache *scenebuilder.SceneCache, exportDir string) AppPhase {
 	r := render{
 		logger: logger,
 
@@ -408,14 +409,14 @@ func (r *render) Shutdown() error {
 type encode struct {
 	emptyPhase
 
-	sceneCache *script.SceneCache
+	sceneCache *scenebuilder.SceneCache
 
 	encodeCmd    *exec.Cmd
 	encodeActive bool
 	exportDir    string
 }
 
-func EncodePhase(sceneCache *script.SceneCache, exportDir string) AppPhase {
+func EncodePhase(sceneCache *scenebuilder.SceneCache, exportDir string) AppPhase {
 	return &encode{
 		sceneCache: sceneCache,
 		exportDir:  exportDir,
@@ -485,12 +486,12 @@ type loadScript struct {
 	emptyPhase
 
 	scriptPath string
-	sceneCache *script.SceneCache
+	sceneCache *scenebuilder.SceneCache
 
 	abort bool
 }
 
-func LoadScriptPhase(sceneCache *script.SceneCache, scriptPath string) AppPhase {
+func LoadScriptPhase(sceneCache *scenebuilder.SceneCache, scriptPath string) AppPhase {
 	return &loadScript{
 		scriptPath: scriptPath,
 		sceneCache: sceneCache,
