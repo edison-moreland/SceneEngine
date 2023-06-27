@@ -11,6 +11,7 @@ import (
 	"github.com/d5/tengo/v2/stdlib"
 
 	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"
+	"github.com/edison-moreland/SceneEngine/scene_engine/scenebuilder"
 	"github.com/edison-moreland/SceneEngine/scene_engine/script/builtins"
 )
 
@@ -22,30 +23,11 @@ var (
 //go:embed runtime.tengo
 var runtimeSource []byte
 
-func emptyScene() messages.Scene {
-	return messages.Scene{
-		Camera: messages.Camera{
-			Aperture: 0.1,
-			Fov:      90,
-			LookAt: messages.Position{
-				X: 0,
-				Y: 0,
-				Z: 0,
-			},
-			LookFrom: messages.Position{
-				X: 4,
-				Y: 0,
-				Z: 0,
-			},
-		},
-	}
-}
-
-func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
+func LoadSceneScript(sceneCache *scenebuilder.SceneCache, sceneScript string) error {
 	globals := make([]tengo.Object, tengo.GlobalsSize)
 	symbolTable := tengo.NewSymbolTable()
 
-	currentScene := emptyScene()
+	sb := scenebuilder.New(sceneCache)
 
 	// Globals are only available to the runtime
 	rtBegin := symbolTable.Define("rt_begin")
@@ -64,7 +46,7 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 			return nil, err
 		}
 
-		sceneCache.Reset(userConfig)
+		sb.Reset(userConfig)
 
 		return &tengo.Map{Value: map[string]tengo.Object{
 			"count":   &tengo.Int{Value: int64(userConfig.FrameCount)},
@@ -83,8 +65,7 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 			return nil, tengo.ErrInvalidArgumentType{Name: "frame"}
 		}
 
-		sceneCache.CacheScene(uint64(frame), currentScene)
-		currentScene = emptyScene()
+		sb.Commit(uint64(frame))
 
 		return nil, nil
 	}}
@@ -121,7 +102,7 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 					return nil, tengo.ErrInvalidArgumentType{Name: "material"}
 				}
 
-				currentScene.Objects = append(currentScene.Objects, messages.Object{
+				sb.AddObject(messages.Object{
 					Material: material.Material,
 					Shape:    shape.Shape,
 				})
@@ -137,43 +118,40 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 					return nil, tengo.ErrWrongNumArguments
 				}
 
-				var ok bool
-
 				// First two are always look_from and look_at
-				lookFrom, ok := args[0].(*builtins.Vec3)
-				if !ok {
-					return nil, tengo.ErrInvalidArgumentType{Name: "look_from"}
+				lookFrom, err := builtins.GetArg(builtins.ToPosition, args, 0, "look_from")
+				if err != nil {
+					return nil, err
 				}
 
-				lookAt, ok := args[1].(*builtins.Vec3)
-				if !ok {
-					return nil, tengo.ErrInvalidArgumentType{Name: "look_at"}
+				lookAt, err := builtins.GetArg(builtins.ToPosition, args, 1, "look_at")
+				if err != nil {
+					return nil, err
 				}
 
 				fov := float64(90)
 				aperture := 0.1
 				switch argCount {
 				case 4:
-					aperture, ok = tengo.ToFloat64(args[3])
-					if !ok {
-						return nil, tengo.ErrInvalidArgumentType{Name: "aperture"}
+					aperture, err = builtins.GetArg(tengo.ToFloat64, args, 3, "aperture")
+					if err != nil {
+						return nil, err
 					}
 
 					fallthrough
 				case 3:
-					fov, ok = tengo.ToFloat64(args[2])
-					if !ok {
-						return nil, tengo.ErrInvalidArgumentType{Name: "fov"}
+					fov, err = builtins.GetArg(tengo.ToFloat64, args, 2, "fov")
+					if err != nil {
+						return nil, err
 					}
-
 				}
 
-				currentScene.Camera = messages.Camera{
+				sb.SetCamera(messages.Camera{
 					Aperture: aperture,
 					Fov:      fov,
-					LookAt:   lookAt.Position(),
-					LookFrom: lookFrom.Position(),
-				}
+					LookAt:   lookAt,
+					LookFrom: lookFrom,
+				})
 
 				return nil, nil
 			},
@@ -192,10 +170,10 @@ func LoadSceneScript(sceneCache *SceneCache, sceneScript string) error {
 	}
 
 	moduleMap := tengo.NewModuleMap()
-	addStdLib(moduleMap, "fmt", "math", "rand")
 	moduleMap.AddSourceModule("userscript", source)
-	//libraries.AddSceneEngineLibraries(moduleMap)
+	addStdLib(moduleMap, "fmt", "math", "rand")
 
+	// TODO: Play with modifying AST, maybe replicate swift's result builder
 	fileSet := parser.NewFileSet()
 	runtimeFile := fileSet.AddFile("runtime", -1, len(runtimeSource))
 	p := parser.NewParser(runtimeFile, runtimeSource, nil)

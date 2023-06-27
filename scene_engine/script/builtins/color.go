@@ -13,17 +13,17 @@ func builtinColor(args ...tengo.Object) (ret tengo.Object, err error) {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	r, err := getArg(tengo.ToInt, args, 0, "R")
+	r, err := GetArg(tengo.ToInt, args, 0, "R")
 	if err != nil {
 		return nil, err
 	}
 
-	g, err := getArg(tengo.ToInt, args, 1, "G")
+	g, err := GetArg(tengo.ToInt, args, 1, "G")
 	if err != nil {
 		return nil, err
 	}
 
-	b, err := getArg(tengo.ToInt, args, 2, "B")
+	b, err := GetArg(tengo.ToInt, args, 2, "B")
 	if err != nil {
 		return nil, err
 	}

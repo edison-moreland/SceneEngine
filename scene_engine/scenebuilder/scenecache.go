@@ -1,4 +1,4 @@
-package script
+package scenebuilder
 
 import (
 	"github.com/edison-moreland/SceneEngine/scene_engine/core/messages"

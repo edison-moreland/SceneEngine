@@ -15,17 +15,17 @@ func builtinVec3(args ...tengo.Object) (ret tengo.Object, err error) {
 		return nil, tengo.ErrWrongNumArguments
 	}
 
-	x, err := getArg(tengo.ToFloat64, args, 0, "X")
+	x, err := GetArg(tengo.ToFloat64, args, 0, "X")
 	if err != nil {
 		return nil, err
 	}
 
-	y, err := getArg(tengo.ToFloat64, args, 1, "Y")
+	y, err := GetArg(tengo.ToFloat64, args, 1, "Y")
 	if err != nil {
 		return nil, err
 	}
 
-	z, err := getArg(tengo.ToFloat64, args, 2, "Z")
+	z, err := GetArg(tengo.ToFloat64, args, 2, "Z")
 	if err != nil {
 		return nil, err
 	}
