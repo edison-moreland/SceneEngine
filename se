@@ -21,13 +21,15 @@ function generate_submsg_libraries() {
 }
 
 function run_scene_engine() {
+  example="${1}"
+
   generate_submsg_libraries
   compile_render_core
   compile_scene_engine
-  "${project_root}"/build/bin/scene_engine --core="${project_root}/build/bin/render_core" --script="${project_root}/examples/scene.tengo"
+  "${project_root}"/build/bin/scene_engine --core="${project_root}/build/bin/render_core" --script="${project_root}/examples/${example}.tengo"
 }
 
-case "${1:-run}" in
+case "${1}" in
   "build")
     generate_submsg_libraries
     compile_render_core
@@ -43,7 +45,7 @@ case "${1:-run}" in
     generate_submsg_libraries
     ;;
   "run")
-    run_scene_engine
+    run_scene_engine "${2:-scene}"
     ;;
   *)
     echo "That's not a command!"

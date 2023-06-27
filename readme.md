@@ -13,32 +13,37 @@ config := {
 }
 
 export scene(config, func(frame, seconds) {
-    object(
-        sphere(vec3(0, 1, 0), 1),
-        dielectric(1.5)
-    )
-
-    object(
-        sphere(vec3(-4, 1, 0), 1),
-        lambert(color(102, 51, 25))
-    )
-
-    object(
-        sphere(vec3(4, 1, 0), 1),
-        metal(color(178, 153, 127), 0.0)
-    )
+    camera(vec3(13, 2, 3), vec3(0, 0, 0), 20)
 
     // Ground sphere
-    object(
-        sphere(vec3(0, -1000, 0), 1000),
-        lambert(color(127, 127, 127))
-    )
+    object(sphere(vec3(0, -1000, 0), 1000),
+           diffuse(color(127, 127, 127)))
 
-    camera(
-        vec3(13, 2, 3),
-        vec3(0, 0, 0),
-        20
-    )
+    // Show off each material
+    object(sphere(vec3(0, 1, 0), 1), 
+           dielectric(1.5))
+
+    object(sphere(vec3(-4, 1, 0), 1),
+           diffuse(color(102, 51, 25)))
+
+    object(sphere(vec3(4, 1, 0), 1),
+           metallic(color(178, 153, 127), 0.0))
+
+    // Add some sprinkles
+    for a := -11; a < 11; a++ {
+        for b := -11; b < 11; b++ {
+            center := vec3(a + (0.9 * rand_float()), 
+                           0.2,
+                           b + (0.9 * rand_float()))
+
+            if (center - vec3(4, 0.2, 0)).length > 0.9 {
+                object(sphere(center, 0.2),
+                       rand_choice([0.80, diffuse(rand_color())],
+                                   [0.15, metallic(rand_color(0.5), rand_float()/2)],
+                                   [0.05, dielectric(1.5)]))
+            }
+        }
+    }
 })
 ```
 
@@ -55,5 +60,5 @@ Requirements:
 
 Running:
 ```bash
-./se run
+./se run [example_name]
 ```
