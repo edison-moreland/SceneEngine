@@ -30,6 +30,7 @@ var SceneEngineBuiltins = []*tengo.BuiltinFunction{
 	// Textures
 	{Name: "uniform", Value: builtinUniform},
 	{Name: "checker", Value: builtinChecker},
+	{Name: "perlin", Value: builtinPerlin},
 	// Rand
 	{Name: "rand_color", Value: builtinRandColor},
 	{Name: "rand_vec3", Value: builtinRandVec3},

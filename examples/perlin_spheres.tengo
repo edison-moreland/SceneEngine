@@ -1,0 +1,16 @@
+config := {
+    aspect_ratio: 1.0,
+    image_width: 600,
+    samples: 100,
+    depth: 50
+}
+
+export scene(config, func(frame, seconds) {
+    camera(vec3(13, 2, 3), vec3(0, 0, 0), 20, 0.0)
+
+    tex := perlin(1)
+
+    object(sphere(vec3(0, -1000, 0), 1000), diffuse(tex))
+    object(sphere(vec3(0, 2, 0), 2), diffuse(tex))
+
+})

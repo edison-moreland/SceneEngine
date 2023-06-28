@@ -511,16 +511,60 @@ primitive UnmarshalMsgPackChecker
         even',
         odd'
         )
+class val Perlin is MsgPackMarshalable
+    var scale: F64
+
+    new val create(
+        scale': F64
+        ) =>
+        scale = scale'
+
+    new val zero() =>
+        scale = 0.0
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 1)?
+        MessagePackEncoder.fixstr(w, "Scale")?
+        MessagePackEncoder.float_64(w, scale)
+
+primitive UnmarshalMsgPackPerlin
+    fun apply(r: Reader ref): Perlin =>
+        var scale': F64 = 0.0
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
+                | "Scale" =>
+                    scale' = MessagePackDecoder.f64(r)?
+                else
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        Perlin(
+        scale'
+        )
 class val Texture is MsgPackMarshalable
     var one_of: (
         Uniform |
-        Checker 
+        Checker |
+        Perlin 
     )
 
     new val create(
         one_of': (
             Uniform |
-            Checker 
+            Checker |
+            Perlin 
             )
         ) =>
 
@@ -537,6 +581,9 @@ class val Texture is MsgPackMarshalable
         | let o: Checker =>
             MessagePackEncoder.uint_8(w, 1)
             o.marshal_msgpack(w)?
+        | let o: Perlin =>
+            MessagePackEncoder.uint_8(w, 2)
+            o.marshal_msgpack(w)?
         end
 
 primitive UnmarshalMsgPackTexture
@@ -546,6 +593,7 @@ primitive UnmarshalMsgPackTexture
         Texture(match MessagePackDecoder.u8(r)?
         | 0 => UnmarshalMsgPackUniform(r)
         | 1 => UnmarshalMsgPackChecker(r)
+        | 2 => UnmarshalMsgPackPerlin(r)
         else
             Debug("broken oneof" where stream = DebugErr)
             Uniform.zero()

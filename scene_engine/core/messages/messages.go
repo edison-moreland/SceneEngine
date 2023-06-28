@@ -129,11 +129,14 @@ type Checker struct {
 	Even Texture
 	Odd  Texture
 }
+type Perlin struct {
+	Scale float64
+}
 type Texture struct {
 	OneOf any
 }
 
-func TextureFrom[T Uniform | Checker](v T) Texture {
+func TextureFrom[T Uniform | Checker | Perlin](v T) Texture {
 	return Texture{OneOf: v}
 }
 func (o Texture) EncodeMsgpack(e *v5.Encoder) error {
@@ -143,6 +146,8 @@ func (o Texture) EncodeMsgpack(e *v5.Encoder) error {
 		err = e.EncodeUint8(0)
 	case Checker:
 		err = e.EncodeUint8(1)
+	case Perlin:
+		err = e.EncodeUint8(2)
 	default:
 		err = submsg.ErrUnknownOneOfField
 	}
@@ -163,6 +168,10 @@ func (o Texture) DecodeMsgpack(d *v5.Decoder) error {
 		o.OneOf = v
 	case 1:
 		var v Checker
+		err = d.Decode(&v)
+		o.OneOf = v
+	case 2:
+		var v Perlin
 		err = d.Decode(&v)
 		o.OneOf = v
 	default:

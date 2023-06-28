@@ -49,11 +49,17 @@ types:
       even: texture
       odd: texture
 
+  - name: perlin
+    type: struct
+    fields:
+      scale: Float
+
   - name: texture
     type: one_of
     members:
       - uniform
       - checker
+      - perlin
 
   - name: diffuse
     type: struct

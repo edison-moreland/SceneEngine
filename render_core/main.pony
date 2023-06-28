@@ -71,7 +71,7 @@ actor Main is CoreServer
         let r: Reader = Reader
         r.append(consume body)
 
-        let frame_scene = scene.Transform(UnmarshalMsgPackScene(consume r), render_config)
+        let frame_scene = scene.Transform(rand, UnmarshalMsgPackScene(consume r), render_config)
 
         let pixel = PixelBatcher(client, render_config.image_width.usize())
 

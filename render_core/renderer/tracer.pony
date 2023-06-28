@@ -291,3 +291,6 @@ class val QueryTexture is TextureVisitor[Vec3]
         else
             this(c.even)
         end
+
+    fun ref visit_perlin(r: Perlin box): Vec3 =>
+        Vec3.one() * r.source.noise(p)

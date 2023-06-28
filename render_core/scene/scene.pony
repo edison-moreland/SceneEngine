@@ -1,4 +1,5 @@
 use "debug"
+use "random"
 
 use messages = "../messages"
 use "../math"
@@ -49,12 +50,12 @@ class val Camera
 
 primitive Transform
     // Transform the scene from the wire into a structure we can trace with
-    fun apply(scene': messages.Scene, config': messages.Config): Scene =>
+    fun apply(rand: Rand ref, scene': messages.Scene, config': messages.Config): Scene =>
         let shapes' = recover Array[Shape](scene'.objects.size()) end
 
         for o in scene'.objects.values() do
             // TODO: Objects with multiple shapes
-            shapes'.push(transform_object(o))
+            shapes'.push(transform_object(rand, o))
         end
 
         let root_shape = if config'.use_bvh then
@@ -80,8 +81,8 @@ primitive Transform
             aspect_ratio = config'.aspect_ratio
         )
 
-    fun transform_object(object': messages.Object): Shape =>
-        transform_shape(object'.shape, transform_material(object'.material))
+    fun transform_object(rand: Rand ref, object': messages.Object): Shape =>
+        transform_shape(object'.shape, transform_material(rand, object'.material))
 
     fun transform_shape(shape: messages.Shape, material: Material): Shape =>
         match shape.one_of
@@ -100,15 +101,15 @@ primitive Transform
             z' = p'.z
         )
 
-    fun transform_material(material: messages.Material): Material =>
+    fun transform_material(rand: Rand ref, material: messages.Material): Material =>
         match material.one_of
         | let l: messages.Diffuse =>
             Diffuse(where
-                texture' = transform_texture(l.texture)
+                texture' = transform_texture(rand, l.texture)
             )
         | let m: messages.Metallic =>
             Metallic(where
-                texture' = transform_texture(m.texture),
+                texture' = transform_texture(rand, m.texture),
                 scatter' = m.scatter
             )
         | let d: messages.Dielectric =>
@@ -117,7 +118,7 @@ primitive Transform
             )
         end
 
-    fun transform_texture(texture: messages.Texture): Texture =>
+    fun transform_texture(rand: Rand ref, texture: messages.Texture): Texture =>
         match texture.one_of
         | let u: messages.Uniform =>
             Uniform(where
@@ -125,8 +126,13 @@ primitive Transform
             )
         | let c: messages.Checker =>
             Checker(where
-                even' = transform_texture(c.even),
-                odd' = transform_texture(c.odd)
+                even' = transform_texture(rand, c.even),
+                odd' = transform_texture(rand, c.odd)
+            )
+        | let p: messages.Perlin =>
+            Perlin(where
+                source' = PerlinNoise.new_source(rand),
+                scale' = p.scale
             )
         end
 

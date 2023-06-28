@@ -193,6 +193,8 @@ func (p *preview) textureColor(t messages.Texture) rl.Color {
 		return rl.NewColor(c.R, c.G, c.B, 255)
 	case messages.Checker:
 		return p.textureColor(t.Even)
+	case messages.Perlin:
+		return rl.Gray
 	}
 	panic("Texture not implemented " + fmt.Sprintf("%#v", t))
 }

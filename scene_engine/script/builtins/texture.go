@@ -44,6 +44,21 @@ func builtinChecker(args ...tengo.Object) (tengo.Object, error) {
 	})}, nil
 }
 
+func builtinPerlin(args ...tengo.Object) (tengo.Object, error) {
+	if len(args) != 1 {
+		return nil, tengo.ErrWrongNumArguments
+	}
+
+	scale, err := GetArg(tengo.ToFloat64, args, 0, "scale")
+	if err != nil {
+		return nil, err
+	}
+
+	return &Texture{Texture: messages.TextureFrom(messages.Perlin{
+		Scale: scale,
+	})}, nil
+}
+
 func ToTexture(o tengo.Object) (messages.Texture, bool) {
 	switch o := o.(type) {
 	case *Texture:
