@@ -105,6 +105,7 @@ type Config struct {
 	ImageHeight uint64
 	ImageWidth  uint64
 	Samples     uint64
+	Sky         bool
 	UseBvh      bool
 }
 type Position struct {
@@ -190,11 +191,15 @@ type Metallic struct {
 type Dielectric struct {
 	IndexOfRefraction float64
 }
+type Emissive struct {
+	Brightness float64
+	Texture    Texture
+}
 type Material struct {
 	OneOf any
 }
 
-func MaterialFrom[T Diffuse | Metallic | Dielectric](v T) Material {
+func MaterialFrom[T Diffuse | Metallic | Dielectric | Emissive](v T) Material {
 	return Material{OneOf: v}
 }
 func (o Material) EncodeMsgpack(e *v5.Encoder) error {
@@ -206,6 +211,8 @@ func (o Material) EncodeMsgpack(e *v5.Encoder) error {
 		err = e.EncodeUint8(1)
 	case Dielectric:
 		err = e.EncodeUint8(2)
+	case Emissive:
+		err = e.EncodeUint8(3)
 	default:
 		err = submsg.ErrUnknownOneOfField
 	}
@@ -230,6 +237,10 @@ func (o Material) DecodeMsgpack(d *v5.Decoder) error {
 		o.OneOf = v
 	case 2:
 		var v Dielectric
+		err = d.Decode(&v)
+		o.OneOf = v
+	case 3:
+		var v Emissive
 		err = d.Decode(&v)
 		o.OneOf = v
 	default:

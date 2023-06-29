@@ -116,6 +116,11 @@ primitive Transform
             Dielectric(where
                 ior = d.index_of_refraction
             )
+        | let e: messages.Emissive =>
+            Emissive(where
+                texture' = transform_texture(rand, e.texture),
+                brightness' = e.brightness
+            )
         end
 
     fun transform_texture(rand: Rand ref, texture: messages.Texture): Texture =>

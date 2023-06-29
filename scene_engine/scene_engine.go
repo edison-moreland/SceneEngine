@@ -221,6 +221,8 @@ func (p *preview) drawScenePreview() {
 			objectColor = p.textureColor(m.Texture)
 		case messages.Metallic:
 			objectColor = p.textureColor(m.Texture)
+		case messages.Emissive:
+			objectColor = p.textureColor(m.Texture)
 
 			// Dielectric gets default color
 		}

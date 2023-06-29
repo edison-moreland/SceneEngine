@@ -62,6 +62,27 @@ func builtinDielectric(args ...tengo.Object) (ret tengo.Object, err error) {
 	})}, nil
 }
 
+func builtinEmissive(args ...tengo.Object) (tengo.Object, error) {
+	if len(args) != 2 {
+		return nil, tengo.ErrWrongNumArguments
+	}
+
+	texture, err := GetArg(ToTexture, args, 0, "texture")
+	if err != nil {
+		return nil, err
+	}
+
+	brightness, err := GetArg(tengo.ToFloat64, args, 1, "brightness")
+	if err != nil {
+		return nil, err
+	}
+
+	return &Material{Material: messages.MaterialFrom(messages.Emissive{
+		Texture:    texture,
+		Brightness: brightness,
+	})}, nil
+}
+
 func ToMaterial(o tengo.Object) (messages.Material, bool) {
 	switch o := o.(type) {
 	case *Material:

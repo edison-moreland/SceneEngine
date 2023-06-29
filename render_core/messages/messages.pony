@@ -127,6 +127,7 @@ class val Config is MsgPackMarshalable
     var image_height: U64
     var image_width: U64
     var samples: U64
+    var sky: Bool
     var use_bvh: Bool
 
     new val create(
@@ -137,6 +138,7 @@ class val Config is MsgPackMarshalable
         image_height': U64,
         image_width': U64,
         samples': U64,
+        sky': Bool,
         use_bvh': Bool
         ) =>
         aspect_ratio = aspect_ratio'
@@ -146,6 +148,7 @@ class val Config is MsgPackMarshalable
         image_height = image_height'
         image_width = image_width'
         samples = samples'
+        sky = sky'
         use_bvh = use_bvh'
 
     new val zero() =>
@@ -156,10 +159,11 @@ class val Config is MsgPackMarshalable
         image_height = 0
         image_width = 0
         samples = 0
+        sky = false
         use_bvh = false
 
     fun marshal_msgpack(w: Writer ref)? =>
-        MessagePackEncoder.fixmap(w, 8)?
+        MessagePackEncoder.fixmap(w, 9)?
         MessagePackEncoder.fixstr(w, "AspectRatio")?
         MessagePackEncoder.float_64(w, aspect_ratio)
         MessagePackEncoder.fixstr(w, "Depth")?
@@ -174,6 +178,8 @@ class val Config is MsgPackMarshalable
         MessagePackEncoder.uint_64(w, image_width)
         MessagePackEncoder.fixstr(w, "Samples")?
         MessagePackEncoder.uint_64(w, samples)
+        MessagePackEncoder.fixstr(w, "Sky")?
+        MessagePackEncoder.bool(w, sky)
         MessagePackEncoder.fixstr(w, "UseBvh")?
         MessagePackEncoder.bool(w, use_bvh)
 
@@ -186,6 +192,7 @@ primitive UnmarshalMsgPackConfig
         var image_height': U64 = 0
         var image_width': U64 = 0
         var samples': U64 = 0
+        var sky': Bool = false
         var use_bvh': Bool = false
 
         try
@@ -207,6 +214,8 @@ primitive UnmarshalMsgPackConfig
                     image_width' = MessagePackDecoder.u64(r)?
                 | "Samples" =>
                     samples' = MessagePackDecoder.u64(r)?
+                | "Sky" =>
+                    sky' = MessagePackDecoder.bool(r)?
                 | "UseBvh" =>
                     use_bvh' = MessagePackDecoder.bool(r)?
                 else
@@ -229,6 +238,7 @@ primitive UnmarshalMsgPackConfig
         image_height',
         image_width',
         samples',
+        sky',
         use_bvh'
         )
 class val Position is MsgPackMarshalable
@@ -739,18 +749,72 @@ primitive UnmarshalMsgPackDielectric
         Dielectric(
         index_of_refraction'
         )
+class val Emissive is MsgPackMarshalable
+    var brightness: F64
+    var texture: Texture
+
+    new val create(
+        brightness': F64,
+        texture': Texture
+        ) =>
+        brightness = brightness'
+        texture = texture'
+
+    new val zero() =>
+        brightness = 0.0
+        texture = Texture.zero()
+
+    fun marshal_msgpack(w: Writer ref)? =>
+        MessagePackEncoder.fixmap(w, 2)?
+        MessagePackEncoder.fixstr(w, "Brightness")?
+        MessagePackEncoder.float_64(w, brightness)
+        MessagePackEncoder.fixstr(w, "Texture")?
+        texture.marshal_msgpack(w)?
+
+primitive UnmarshalMsgPackEmissive
+    fun apply(r: Reader ref): Emissive =>
+        var brightness': F64 = 0.0
+        var texture': Texture = Texture.zero()
+
+        try
+            let map_size = Unmarshal.map(r)?
+            for i in Range(0, map_size) do
+                let field_name = MessagePackDecoder.fixstr(r)?
+                match field_name
+                | "Brightness" =>
+                    brightness' = MessagePackDecoder.f64(r)?
+                | "Texture" =>
+                    texture' = UnmarshalMsgPackTexture(r)
+                else
+                    var error_message = String()
+                    error_message.append("unknown field: ")
+                    error_message.append(consume field_name)
+
+                    Debug(error_message where stream = DebugErr)
+                end
+            end
+        else
+            Debug("Error unmarshalling" where stream = DebugErr)
+        end
+
+        Emissive(
+        brightness',
+        texture'
+        )
 class val Material is MsgPackMarshalable
     var one_of: (
         Diffuse |
         Metallic |
-        Dielectric 
+        Dielectric |
+        Emissive 
     )
 
     new val create(
         one_of': (
             Diffuse |
             Metallic |
-            Dielectric 
+            Dielectric |
+            Emissive 
             )
         ) =>
 
@@ -770,6 +834,9 @@ class val Material is MsgPackMarshalable
         | let o: Dielectric =>
             MessagePackEncoder.uint_8(w, 2)
             o.marshal_msgpack(w)?
+        | let o: Emissive =>
+            MessagePackEncoder.uint_8(w, 3)
+            o.marshal_msgpack(w)?
         end
 
 primitive UnmarshalMsgPackMaterial
@@ -780,6 +847,7 @@ primitive UnmarshalMsgPackMaterial
         | 0 => UnmarshalMsgPackDiffuse(r)
         | 1 => UnmarshalMsgPackMetallic(r)
         | 2 => UnmarshalMsgPackDielectric(r)
+        | 3 => UnmarshalMsgPackEmissive(r)
         else
             Debug("broken oneof" where stream = DebugErr)
             Diffuse.zero()

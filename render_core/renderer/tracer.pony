@@ -25,8 +25,12 @@ class Tracer
         )
 
     fun sky_color(r: Ray): Vec3 =>
-        let t: F64 = 0.5 * (r.direction.unit().y + 1.0)
-        (Vec3(1.0, 1.0, 1.0) * (1.0 - t)) + (Vec3(0.5, 0.7, 1.0) * t )
+        if _config.sky then
+            let t: F64 = 0.5 * (r.direction.unit().y + 1.0)
+            (Vec3(1.0, 1.0, 1.0) * (1.0 - t)) + (Vec3(0.5, 0.7, 1.0) * t )
+        else
+            Vec3.zero()
+        end
 
     fun ref camera_ray(s: F64, t: F64): Ray =>
         let c = _scene.camera
@@ -65,8 +69,10 @@ class Tracer
         | let rec: HitRecord =>
             // Bounce ray again
             match ScatterMaterial(_rand, r, rec)(rec.material)
-            | (let attenuation: Vec3, let scattered: Ray) =>
-                attenuation * trace(scattered, depth-1)
+            | (let attenuation: Vec3, let emitted: Vec3, let scattered: Ray) =>
+                emitted + (attenuation * trace(scattered, depth-1))
+            | (let emitted: Vec3) =>
+                emitted
             | None =>
                 Vec3.zero()
             end
@@ -203,7 +209,8 @@ class HitShape is ShapeVisitor[(HitRecord | None)]
         (let u, let v) = sphere_uv(p)
         HitRecord.from_ray(r, (p - s.origin) / s.radius, root, p, u, v, s.material)
 
-class val ScatterMaterial is MaterialVisitor[((Vec3, Ray) | None)] // (color, attenuation)
+type ScatterMaterialReturn is ((Vec3, Vec3, Ray) | Vec3 | None) // (attenuation, emitted, scattered) | (emitted)
+class val ScatterMaterial is MaterialVisitor[ScatterMaterialReturn]
     let _rand: Rand ref
 
     let ray_in: Ray
@@ -214,10 +221,10 @@ class val ScatterMaterial is MaterialVisitor[((Vec3, Ray) | None)] // (color, at
         ray_in = ray_in'
         rec = rec'
 
-    fun ref apply(m: Material): ((Vec3, Ray) | None) =>
-        m.accept[((Vec3, Ray) | None)](this)
+    fun ref apply(m: Material): ScatterMaterialReturn =>
+        m.accept[ScatterMaterialReturn](this)
 
-    fun ref visit_diffuse(d: Diffuse box): ((Vec3, Ray) | None) =>
+    fun ref visit_diffuse(d: Diffuse box): ScatterMaterialReturn =>
         var scatter_direction = rec.normal + RandomVec3.unit_circle(_rand)
 
         if scatter_direction.near_zero() then
@@ -226,14 +233,16 @@ class val ScatterMaterial is MaterialVisitor[((Vec3, Ray) | None)] // (color, at
 
         (
             QueryTexture(rec.u, rec.v, rec.p)(d.texture),
+            Vec3.zero(),
             Ray(rec.p, scatter_direction)
         )
 
-    fun ref visit_metallic(m: Metallic box): ((Vec3, Ray) | None) =>
+    fun ref visit_metallic(m: Metallic box): ScatterMaterialReturn =>
         let reflected = ray_in.direction.unit().reflect(rec.normal)
 
         (
             QueryTexture(rec.u, rec.v, rec.p)(m.texture),
+            Vec3.zero(),
             Ray(rec.p, reflected)
         )
 
@@ -242,7 +251,7 @@ class val ScatterMaterial is MaterialVisitor[((Vec3, Ray) | None)] // (color, at
         let r0 = ((1 - ri) / (1 + ri)).pow(2)
         r0 + ((1-r0) * (1 - cosine).pow(5))
 
-    fun ref visit_dielectric(d: Dielectric box): ((Vec3, Ray) | None) =>
+    fun ref visit_dielectric(d: Dielectric box): ScatterMaterialReturn =>
         let refraction_ratio = if rec.front_face then
             (1/d.index_of_refraction)
         else
@@ -265,8 +274,12 @@ class val ScatterMaterial is MaterialVisitor[((Vec3, Ray) | None)] // (color, at
 
         (
             Vec3.one(),
+            Vec3.zero(),
             Ray(rec.p, direction)
         )
+
+    fun ref visit_emissive(e: Emissive box): ScatterMaterialReturn =>
+        QueryTexture(rec.u, rec.v, rec.p)(e.texture) * e.brightness
 
 class val QueryTexture is TextureVisitor[Vec3]
     let u: F64

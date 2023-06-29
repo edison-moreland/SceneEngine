@@ -16,6 +16,7 @@ types:
       frame_count: Uint
       frame_speed: Uint
       use_bvh: Bool
+      sky: Bool
 
   - name: position
     type: struct
@@ -77,12 +78,19 @@ types:
     fields:
       index_of_refraction: Float
 
+  - name: emissive
+    type: struct
+    fields:
+      texture: texture
+      brightness: Float
+
   - name: material
     type: one_of
     members:
       - diffuse
       - metallic
       - dielectric
+      - emissive
 
   - name: sphere
     type: struct

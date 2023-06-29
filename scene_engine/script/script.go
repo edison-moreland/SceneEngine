@@ -208,6 +208,7 @@ func getConfig(o *tengo.Map) (messages.Config, error) {
 	config.Depth = 50
 	config.Samples = 50
 	config.UseBvh = true
+	config.Sky = true
 
 	for key, val := range o.Value {
 		switch key {
@@ -253,6 +254,13 @@ func getConfig(o *tengo.Map) (messages.Config, error) {
 				return config, fmt.Errorf("%w: got %T for %s", ErrConfigValueIncorrectType, val, key)
 			}
 			config.UseBvh = useBVH
+		case "sky":
+			sky, ok := tengo.ToBool(val)
+			if !ok {
+				return config, fmt.Errorf("%w: got %T for %s", ErrConfigValueIncorrectType, val, key)
+			}
+			config.Sky = sky
+
 		default:
 			return config, fmt.Errorf("%w: %s", ErrUnknownConfigValue, key)
 		}

@@ -3,10 +3,11 @@ math := import("math")
 config := {
     aspect_ratio: (3.0 / 2.0),
     image_width: 400,
-    samples: 50,
+    samples: 1000,
     depth: 50,
-    frame_count: (30 * 5),
-    frame_speed: 30
+    frame_count: (60 * 5),
+    frame_speed: 60,
+    sky: false
 }
 
 export scene(config, func(frame, seconds) {
@@ -26,12 +27,12 @@ export scene(config, func(frame, seconds) {
 
     object(
         sphere(vec3(0, 1, 0), 1),
-        dielectric(1.5)
+        emissive(color(255, 255, 255), 4)
     )
 
     object(
         sphere(vec3(-sphere_distance, 1, 0), 1),
-        diffuse(color(102, 51, 25))
+        dielectric(1.5)
     )
 
     object(

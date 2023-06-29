@@ -27,6 +27,7 @@ var SceneEngineBuiltins = []*tengo.BuiltinFunction{
 	{Name: "diffuse", Value: builtinDiffuse},
 	{Name: "metallic", Value: builtinMetallic},
 	{Name: "dielectric", Value: builtinDielectric},
+	{Name: "emissive", Value: builtinEmissive},
 	// Textures
 	{Name: "uniform", Value: builtinUniform},
 	{Name: "checker", Value: builtinChecker},
